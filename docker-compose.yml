@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: users_postgres
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    restart: always
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    restart: always
+
+  usersservice:
+    build:
+      context: ./UsersService
+    container_name: usersservice
+    depends_on:
+      - postgres
+    env_file:
+      - ./UsersService/.env
+    ports:
+      - "8081:8081"
+    restart: always
+
+  authservice:
+    build:
+      context: ./AuthService
+    container_name: authservice
+    depends_on:
+      - redis
+      - usersservice
+    env_file:
+      - ./AuthService/.env
+    ports:
+      - "8080:8080"
+    restart: always

@@ -14,14 +14,14 @@ type AuthHandler struct {
 	service *service.Service
 	log     *zap.Logger
 	client  UsersClient.ClientProvider
-	сfg     *config.Config
+	cfg     *config.Config
 }
 
 func New(service *service.Service, logger *zap.Logger, cfg *config.Config, client UsersClient.ClientProvider) *AuthHandler {
 	return &AuthHandler{
 		service: service,
 		log:     logger,
-		сfg:     cfg,
+		cfg:     cfg,
 		client:  client,
 	}
 }
