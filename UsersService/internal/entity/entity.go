@@ -2,7 +2,7 @@ package entity
 
 import "github.com/google/uuid"
 
-type UserInfo struct {
+type UserInfoAuth struct {
 	ID           uuid.UUID `json:"id"`
 	Login        string    `json:"login"`
 	Password     string    `json:"password"`
@@ -45,4 +45,19 @@ type LoginResponse struct {
 
 type RefreshTokenResponse struct {
 	RefreshToken string `json:"refresh_token"`
+}
+
+// ProfileUserInfoResponse - информация о профиле пользователя
+type ProfileUserInfoResponse struct {
+	Username  string `json:"username"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	Bio       string `json:"bio"`
+}
+
+type UpdateUserProfileInfoRequest struct {
+	Username  string `json:"username"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	Bio       string `json:"bio"`
 }

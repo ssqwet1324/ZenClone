@@ -1,4 +1,4 @@
-package service
+package usecase
 
 import (
 	"UsersService/internal/config"
@@ -14,8 +14,9 @@ import (
 type RepositoryProvider interface {
 	AddUser(ctx context.Context, addUserInfo entity.AddUserRequest) error
 	GetUserInfoByLogin(ctx context.Context, login string) (*entity.LoginResponse, error)
-	GetUserInfoByUserID(ctx context.Context, id uuid.UUID) (*entity.RefreshTokenResponse, error)
 	UpdateRefreshToken(ctx context.Context, id uuid.UUID, refreshToken string) error
+	GetRefreshTokenByUserID(ctx context.Context, id uuid.UUID) (*entity.RefreshTokenResponse, error)
+	GetUserProfileByUsername(ctx context.Context, username string) (*entity.ProfileUserInfoResponse, error)
 }
 type UserService struct {
 	log  *zap.Logger
@@ -46,11 +47,6 @@ func (s *UserService) CompareAuthData(ctx context.Context, users entity.AuthRequ
 
 	response, err := s.repo.GetUserInfoByLogin(ctx, users.Login)
 
-	//s.log.Info("CompareAuthData input passwords",
-	//	zap.String("USERS: passwordFromUser", users.Password),
-	//	zap.String("RESPONSE: passwordHashFromDB", response.Password),
-	//)
-
 	if err != nil {
 		return nil, fmt.Errorf("GetUserInfoByLogin error: %w", err)
 	}
@@ -63,11 +59,6 @@ func (s *UserService) CompareAuthData(ctx context.Context, users entity.AuthRequ
 		return nil, fmt.Errorf("неверный пароль: %w", err)
 	}
 
-	//fmt.Println("CompareAuthData service", "Byteresponse:", []byte(response.Password), "UsersPassword:", []byte(users.Password))
-
-	////!!!!!!!!!!!!!!!!!!
-	//fmt.Println("Service UsersService CompareAuthData", &compareData)
-
 	return &compareData, nil
 }
 
@@ -75,9 +66,9 @@ func (s *UserService) CompareAuthData(ctx context.Context, users entity.AuthRequ
 func (s *UserService) GetRefreshToken(ctx context.Context, id uuid.UUID) (*entity.TokenResponse, error) {
 	var tokenResponse entity.TokenResponse
 
-	response, err := s.repo.GetUserInfoByUserID(ctx, id)
+	response, err := s.repo.GetRefreshTokenByUserID(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("GetUserInfoByUserID error: %w", err)
+		return nil, fmt.Errorf("GetRefreshTokenByUserID error: %w", err)
 	}
 
 	tokenResponse.RefreshToken = response.RefreshToken
@@ -87,13 +78,25 @@ func (s *UserService) GetRefreshToken(ctx context.Context, id uuid.UUID) (*entit
 
 // UpdateRefreshToken - обновляем refresh токен по ID
 func (s *UserService) UpdateRefreshToken(ctx context.Context, req entity.UpdateRefreshTokenRequest) error {
-	fmt.Println("id:", req.ID, "token: ", req.RefreshToken)
-
 	err := s.repo.UpdateRefreshToken(ctx, req.ID, req.RefreshToken)
-
 	if err != nil {
 		return fmt.Errorf("UpdateRefreshToken: error updating refresh token %w", err)
 	}
 
 	return nil
+}
+
+func (s *UserService) GetUserProfileByUsername(ctx context.Context, username string) (*entity.ProfileUserInfoResponse, error) {
+	var profileInfo entity.ProfileUserInfoResponse
+
+	info, err := s.repo.GetUserProfileByUsername(ctx, username)
+	if err != nil {
+		return nil, fmt.Errorf("GetUserProfileByUsername error: %w", err)
+	}
+
+	profileInfo.FirstName = info.FirstName
+	profileInfo.LastName = info.LastName
+	profileInfo.Bio = info.Bio
+
+	return &profileInfo, nil
 }

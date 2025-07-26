@@ -5,7 +5,7 @@ import (
 	"UsersService/internal/handler"
 	"UsersService/internal/migrations"
 	"UsersService/internal/repository"
-	"UsersService/internal/service"
+	"UsersService/internal/usecase"
 	"context"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -39,7 +39,7 @@ func Run() {
 		log.Fatalf("can't initialize tables: %v", err)
 	}
 
-	usersService := service.New(logger, repo, cfg)
+	usersService := usecase.New(logger, repo, cfg)
 
 	userHandler := handler.New(usersService, logger)
 
@@ -47,6 +47,7 @@ func Run() {
 	server.POST("/compare-auth-data", userHandler.CompareAuthPassword)
 	server.POST("/get-refresh-token", userHandler.GetRefreshToken)
 	server.POST("/update-refresh-token", userHandler.UpdateRefreshToken)
+	server.GET("/get-profile-by-username", userHandler.GetRefreshToken)
 
 	if err := server.Run(":8081"); err != nil {
 		log.Fatal(err)

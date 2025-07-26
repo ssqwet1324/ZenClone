@@ -2,18 +2,18 @@ package handler
 
 import (
 	"UsersService/internal/entity"
-	"UsersService/internal/service"
+	"UsersService/internal/usecase"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"net/http"
 )
 
 type UsersHandler struct {
-	service *service.UserService
+	service *usecase.UserService
 	log     *zap.Logger
 }
 
-func New(service *service.UserService, log *zap.Logger) *UsersHandler {
+func New(service *usecase.UserService, log *zap.Logger) *UsersHandler {
 	return &UsersHandler{
 		service: service,
 		log:     log.Named("UsersHandler"),
@@ -83,4 +83,22 @@ func (h *UsersHandler) AddUser(ctx *gin.Context) {
 		return
 	}
 	ctx.JSON(http.StatusOK, gin.H{"message": "user added"})
+}
+
+func (h *UsersHandler) GetProfile(ctx *gin.Context) {
+	var req entity.ProfileUserInfoResponse
+	username := ctx.Param("username") //извлечь из URL параметр
+
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+
+		return
+	}
+	data, err := h.service.GetUserProfileByUsername(ctx.Request.Context(), username)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+
+		return
+	}
+	ctx.JSON(http.StatusOK, data)
 }

@@ -22,12 +22,17 @@ func New(repo *repository.PostgresRepository, log *zap.Logger) *Migration {
 }
 
 func (m *Migration) InitTables(ctx context.Context) error {
-	query := `CREATE TABLE IF NOT EXISTS users (
-		id UUID PRIMARY KEY,
-		login VARCHAR NOT NULL UNIQUE,
-		password VARCHAR(100) NOT NULL,
-		refresh_token VARCHAR
-	)`
+	query := `CREATE TABLE users (
+    id UUID PRIMARY KEY,
+    login VARCHAR NOT NULL UNIQUE,
+    password VARCHAR(100) NOT NULL,
+    refresh_token VARCHAR,
+    username VARCHAR UNIQUE, 
+    first_name VARCHAR,
+    last_name VARCHAR,
+    bio TEXT,
+    created_at TIMESTAMP DEFAULT now()
+)`
 	maxRetries := 5
 	retryDelay := 5 * time.Second
 
