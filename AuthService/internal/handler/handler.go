@@ -27,7 +27,7 @@ func New(service *service.Service, logger *zap.Logger, cfg *config.Config, clien
 }
 
 func (handler *AuthHandler) Register(ctx *gin.Context) {
-	var user entity.UserInfo
+	var user entity.RegisterRequest
 
 	if err := ctx.ShouldBindJSON(&user); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -37,7 +37,7 @@ func (handler *AuthHandler) Register(ctx *gin.Context) {
 
 	handler.log.Info("Register attempt", zap.String("login", user.Login))
 
-	userID, accessToken, refreshToken, err := handler.service.RegisterUser(ctx, user.Login, user.Password)
+	userID, accessToken, refreshToken, err := handler.service.RegisterUser(ctx, user)
 	if err != nil {
 		handler.log.Error("Register: failed to register user", zap.Error(err))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "registration failed"})
@@ -78,7 +78,7 @@ func (handler *AuthHandler) Refresh(ctx *gin.Context) {
 }
 
 func (handler *AuthHandler) Login(ctx *gin.Context) {
-	var user entity.UserInfo
+	var user entity.LoginUserInfo
 	if err := ctx.ShouldBindJSON(&user); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
 

@@ -18,9 +18,13 @@ type AuthResponse struct {
 }
 
 type RegisterRequest struct {
-	ID       string `json:"id"`
-	Login    string `json:"login"`
-	Password string `json:"password"`
+	ID        string `json:"id"`
+	Login     string `json:"login"`
+	Password  string `json:"password"`
+	Username  string `json:"username"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	Bio       string `json:"bio"`
 }
 
 type UpdateRefreshTokenRequest struct {

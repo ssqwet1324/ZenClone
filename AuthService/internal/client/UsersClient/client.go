@@ -44,8 +44,6 @@ func New(client *resty.Client, log *zap.Logger, cfg *ConfigUsersServiceClient) C
 func (c *clientService) AddUser(ctx context.Context, userData RegisterRequest) error {
 	response, err := c.client.R().SetContext(ctx).SetBody(userData).Post(c.baseUrl + addUser)
 
-	fmt.Println("Client: AddUser:", userData.Password)
-
 	if err != nil {
 		return fmt.Errorf("AddUser: %w", err)
 	}
@@ -69,7 +67,7 @@ func (c *clientService) CompareAuthData(ctx context.Context, userData AuthReques
 		return "", fmt.Errorf("CompareAuthData: %s", response.Body())
 	}
 
-	fmt.Println("AuthResponce client:", string(response.Body()))
+	fmt.Println("AuthResponse client:", string(response.Body()))
 
 	if err := json.Unmarshal(response.Body(), &authResponse); err != nil {
 		return "", fmt.Errorf("CompareAuthData: failed to parse response: %w", err)

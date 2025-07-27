@@ -3,6 +3,7 @@ package service
 import (
 	"AuthService/internal/client/UsersClient"
 	"AuthService/internal/config"
+	"AuthService/internal/entity"
 	"context"
 	"fmt"
 	"strings"
@@ -137,22 +138,22 @@ func (s *Service) ExtractUserIDFromToken(tokenStr, secret string) (string, error
 }
 
 // RegisterUser - регистрируем нового пользователя и посылаем данные в Users Service
-func (s *Service) RegisterUser(ctx context.Context, login, password string) (string, string, string, error) {
+func (s *Service) RegisterUser(ctx context.Context, reg entity.RegisterRequest) (string, string, string, error) {
 	userID := s.GenerateUserID()
 
-	password = "12345"
-
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(reg.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return "", "", "", fmt.Errorf("RegisterUser: failed to hash password: %w", err)
 	}
 
-	fmt.Println(string(hashedPassword))
-
 	err = s.client.AddUser(ctx, UsersClient.RegisterRequest{
-		ID:       userID,
-		Login:    login,
-		Password: string(hashedPassword),
+		ID:        userID,
+		Login:     reg.Login,
+		Password:  string(hashedPassword),
+		Username:  reg.Username,
+		FirstName: reg.FirstName,
+		LastName:  reg.LastName,
+		Bio:       reg.Bio,
 	})
 	if err != nil {
 		return "", "", "", fmt.Errorf("RegisterUser: failed to register user: %w", err)
