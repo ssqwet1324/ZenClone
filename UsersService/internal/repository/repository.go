@@ -36,14 +36,18 @@ func New(cfg *config.Config) (*PostgresRepository, error) {
 
 // AddUser - добавить пользователя в Бд(для ручки /add-user
 func (repo *PostgresRepository) AddUser(ctx context.Context, addUserInfo entity.AddUserRequest) error {
-	_, err := repo.DB.Exec(ctx, `INSERT INTO Users (id, login, password) VALUES ($1, $2, $3)`, addUserInfo.ID, addUserInfo.Login, addUserInfo.Password)
+	_, err := repo.DB.Exec(ctx, `INSERT INTO Users (id, login, password, username, first_name, last_name, bio) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		addUserInfo.ID,
+		addUserInfo.Login,
+		addUserInfo.Password,
+		addUserInfo.Username,
+		addUserInfo.FirstName,
+		addUserInfo.LastName,
+		addUserInfo.Bio, //убрать надо будет т.к чтобы о себе сразу не писать нечего
+	)
 	if err != nil {
 		return fmt.Errorf("AddUser: Error adding user in DB: %v", err)
 	}
-
-	fmt.Println("Repository AddUser:", addUserInfo.Login, addUserInfo.Password)
-
-	//todo добавить сюда параметры на создание профиля сразу
 
 	return nil
 }
@@ -90,9 +94,10 @@ func (repo *PostgresRepository) UpdateRefreshToken(ctx context.Context, id uuid.
 func (repo *PostgresRepository) GetUserProfileByUsername(ctx context.Context, username string) (*entity.ProfileUserInfoResponse, error) {
 	var userInfoResponse entity.ProfileUserInfoResponse
 
-	err := repo.DB.QueryRow(ctx, `SELECT first_name, last_name, bio FROM Users WHERE username = $1`, username).Scan(&userInfoResponse.FirstName,
-		&userInfoResponse.LastName,
-		&userInfoResponse.Bio)
+	err := repo.DB.QueryRow(ctx, `SELECT first_name, last_name, bio FROM Users WHERE username = $1`, username).
+		Scan(&userInfoResponse.FirstName,
+			&userInfoResponse.LastName,
+			&userInfoResponse.Bio)
 
 	if err != nil {
 		return nil, fmt.Errorf("GetUserProfileByUsername: Error getting user information: %v", err)

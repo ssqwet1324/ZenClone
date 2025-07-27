@@ -86,19 +86,13 @@ func (h *UsersHandler) AddUser(ctx *gin.Context) {
 }
 
 func (h *UsersHandler) GetProfile(ctx *gin.Context) {
-	var req entity.ProfileUserInfoResponse
-	username := ctx.Param("username") //извлечь из URL параметр
+	username := ctx.Param("username") // username из URL
 
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-
-		return
-	}
 	data, err := h.service.GetUserProfileByUsername(ctx.Request.Context(), username)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-
 		return
 	}
+
 	ctx.JSON(http.StatusOK, data)
 }

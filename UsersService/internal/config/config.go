@@ -35,12 +35,12 @@ func New() (*Config, error) {
 		return nil, fmt.Errorf("config UserService: Error converting DB_PORT to int")
 	}
 
-	conf.RedisAddr = os.Getenv("REDIS_ADDR")
-	conf.RedisPwd = os.Getenv("REDIS_PWD")
-	conf.RedisDB, err = strconv.ParseInt(os.Getenv("REDIS_DB"), 10, 64)
-	if err != nil {
-		return nil, fmt.Errorf("config UserService: Error converting REDIS_DB to int")
-	}
+	//conf.RedisAddr = os.Getenv("REDIS_ADDR")
+	//conf.RedisPwd = os.Getenv("REDIS_PWD")
+	//conf.RedisDB, err = strconv.ParseInt(os.Getenv("REDIS_DB"), 10, 64)
+	//if err != nil {
+	//	return nil, fmt.Errorf("config UserService: Error converting REDIS_DB to int")
+	//}
 
 	return &conf, nil
 }

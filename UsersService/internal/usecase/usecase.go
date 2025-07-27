@@ -86,6 +86,7 @@ func (s *UserService) UpdateRefreshToken(ctx context.Context, req entity.UpdateR
 	return nil
 }
 
+// GetUserProfileByUsername - получить информацию по профилю пользователя
 func (s *UserService) GetUserProfileByUsername(ctx context.Context, username string) (*entity.ProfileUserInfoResponse, error) {
 	var profileInfo entity.ProfileUserInfoResponse
 

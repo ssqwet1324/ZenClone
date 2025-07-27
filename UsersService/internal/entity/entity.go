@@ -32,9 +32,13 @@ type UpdateRefreshTokenRequest struct {
 }
 
 type AddUserRequest struct {
-	ID       uuid.UUID `json:"id"`
-	Login    string    `json:"login"`
-	Password string    `json:"password"`
+	ID        uuid.UUID `json:"id"`
+	Login     string    `json:"login"`
+	Password  string    `json:"password"`
+	Username  string    `json:"username"`
+	FirstName string    `json:"first_name"`
+	LastName  string    `json:"last_name"`
+	Bio       string    `json:"bio"`
 }
 
 // LoginResponse - - для ручки /compare-auth-data
@@ -49,7 +53,6 @@ type RefreshTokenResponse struct {
 
 // ProfileUserInfoResponse - информация о профиле пользователя
 type ProfileUserInfoResponse struct {
-	Username  string `json:"username"`
 	FirstName string `json:"first_name"`
 	LastName  string `json:"last_name"`
 	Bio       string `json:"bio"`

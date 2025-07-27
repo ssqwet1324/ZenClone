@@ -27,10 +27,10 @@ func (m *Migration) InitTables(ctx context.Context) error {
     login VARCHAR NOT NULL UNIQUE,
     password VARCHAR(100) NOT NULL,
     refresh_token VARCHAR,
-    username VARCHAR UNIQUE, 
-    first_name VARCHAR,
-    last_name VARCHAR,
-    bio TEXT,
+    username VARCHAR NOT NULL UNIQUE, 
+    first_name VARCHAR NOT NULL,
+    last_name VARCHAR NUll,
+    bio TEXT NULL,
     created_at TIMESTAMP DEFAULT now()
 )`
 	maxRetries := 5
