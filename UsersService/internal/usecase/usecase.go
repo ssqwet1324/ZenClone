@@ -14,9 +14,11 @@ import (
 type RepositoryProvider interface {
 	AddUser(ctx context.Context, addUserInfo entity.AddUserRequest) error
 	GetUserInfoByLogin(ctx context.Context, login string) (*entity.LoginResponse, error)
+	GetLoginByUserID(ctx context.Context, id uuid.UUID) (string, error)
 	UpdateRefreshToken(ctx context.Context, id uuid.UUID, refreshToken string) error
 	GetRefreshTokenByUserID(ctx context.Context, id uuid.UUID) (*entity.RefreshTokenResponse, error)
 	GetUserProfileByUsername(ctx context.Context, username string) (*entity.ProfileUserInfoResponse, error)
+	UpdateUserProfile(ctx context.Context, id uuid.UUID, updateProfileInfo entity.UpdateUserProfileInfoRequest) error
 }
 type UserService struct {
 	log  *zap.Logger
@@ -26,7 +28,7 @@ type UserService struct {
 
 func New(log *zap.Logger, repo RepositoryProvider, cfg *config.Config) *UserService {
 	return &UserService{
-		log:  log,
+		log:  log.Named("usecase"),
 		repo: repo,
 		cfg:  cfg,
 	}
@@ -37,6 +39,8 @@ func (s *UserService) AddUser(ctx context.Context, addUserInfo entity.AddUserReq
 	if err != nil {
 		return fmt.Errorf("AddUser: error add login and hash %w", err)
 	}
+
+	s.log.Info("AddUser: Success add user")
 
 	return nil
 }
@@ -59,6 +63,8 @@ func (s *UserService) CompareAuthData(ctx context.Context, users entity.AuthRequ
 		return nil, fmt.Errorf("неверный пароль: %w", err)
 	}
 
+	s.log.Info("CompareAuthData success compare auth data")
+
 	return &compareData, nil
 }
 
@@ -73,6 +79,8 @@ func (s *UserService) GetRefreshToken(ctx context.Context, id uuid.UUID) (*entit
 
 	tokenResponse.RefreshToken = response.RefreshToken
 
+	s.log.Info("GetRefreshToken: success get refresh token")
+
 	return &tokenResponse, nil
 }
 
@@ -82,6 +90,8 @@ func (s *UserService) UpdateRefreshToken(ctx context.Context, req entity.UpdateR
 	if err != nil {
 		return fmt.Errorf("UpdateRefreshToken: error updating refresh token %w", err)
 	}
+
+	s.log.Info("UpdateRefreshToken: success update refresh token")
 
 	return nil
 }
@@ -99,5 +109,58 @@ func (s *UserService) GetUserProfileByUsername(ctx context.Context, username str
 	profileInfo.LastName = info.LastName
 	profileInfo.Bio = info.Bio
 
+	s.log.Info("GetUserProfileByUsername: success get user profile")
+
 	return &profileInfo, nil
+}
+
+func (s *UserService) UpdateUserProfile(ctx context.Context, id uuid.UUID, updateProfileInfo entity.UpdateUserProfileInfoRequest) (*entity.UpdateUserProfileInfoResponse, error) {
+
+	login, err := s.repo.GetLoginByUserID(ctx, id)
+
+	// тут сверяем пароли
+	if updateProfileInfo.PasswordNew != nil && updateProfileInfo.PasswordOld != nil {
+		authRequest := entity.AuthRequest{
+			Login:    login,
+			Password: *updateProfileInfo.PasswordOld,
+		}
+
+		_, err := s.CompareAuthData(ctx, authRequest)
+		if err != nil {
+			return nil, fmt.Errorf("UpdateUserProfile CompareAuthData error: incorrect data: %w", err)
+		}
+
+		// Генерируем новый хеш
+		newHashPassword, err := bcrypt.GenerateFromPassword([]byte(*updateProfileInfo.PasswordNew), bcrypt.DefaultCost)
+		if err != nil {
+			return nil, fmt.Errorf("UpdateUserProfile bcrypt error generating new hash: %w", err)
+		}
+
+		// меняем на хэш
+		hashStr := string(newHashPassword)
+		updateProfileInfo.PasswordNew = &hashStr
+	}
+
+	// Получаем ID пользователя
+	userData, err := s.repo.GetUserInfoByLogin(ctx, login)
+	if err != nil {
+		return nil, fmt.Errorf("UpdateUserProfile error getting user info: %w", err)
+	}
+
+	// обновляем данные
+	err = s.repo.UpdateUserProfile(ctx, userData.ID, updateProfileInfo)
+	if err != nil {
+		return nil, fmt.Errorf("UpdateUserProfile error updating in repo: %w", err)
+	}
+
+	// ответ
+	response := entity.UpdateUserProfileInfoResponse{
+		Username:    updateProfileInfo.Username,
+		FirstName:   updateProfileInfo.FirstName,
+		LastName:    updateProfileInfo.LastName,
+		Bio:         updateProfileInfo.Bio,
+		PasswordNew: updateProfileInfo.PasswordNew,
+	}
+
+	return &response, nil
 }

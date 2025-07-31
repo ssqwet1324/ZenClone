@@ -8,6 +8,7 @@ import (
 )
 
 type Config struct {
+	JWTSecret  string `env:"JWT_SECRET"`
 	DbName     string `env:"DB_NAME"`
 	DbUser     string `env:"DB_USER"`
 	DbPassword string `env:"DB_PASSWORD"`
@@ -26,6 +27,7 @@ func New() (*Config, error) {
 
 	var conf Config
 
+	conf.JWTSecret = os.Getenv("JWT_SECRET")
 	conf.DbName = os.Getenv("DB_NAME")
 	conf.DbUser = os.Getenv("DB_USER")
 	conf.DbPassword = os.Getenv("DB_PASSWORD")
@@ -34,13 +36,6 @@ func New() (*Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("config UserService: Error converting DB_PORT to int")
 	}
-
-	//conf.RedisAddr = os.Getenv("REDIS_ADDR")
-	//conf.RedisPwd = os.Getenv("REDIS_PWD")
-	//conf.RedisDB, err = strconv.ParseInt(os.Getenv("REDIS_DB"), 10, 64)
-	//if err != nil {
-	//	return nil, fmt.Errorf("config UserService: Error converting REDIS_DB to int")
-	//}
 
 	return &conf, nil
 }

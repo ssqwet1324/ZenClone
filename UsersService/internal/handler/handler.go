@@ -4,6 +4,7 @@ import (
 	"UsersService/internal/entity"
 	"UsersService/internal/usecase"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 	"net/http"
 )
@@ -91,6 +92,45 @@ func (h *UsersHandler) GetProfile(ctx *gin.Context) {
 	data, err := h.service.GetUserProfileByUsername(ctx.Request.Context(), username)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, data)
+}
+
+func (h *UsersHandler) UpdateProfile(ctx *gin.Context) {
+	userIDRaw, exists := ctx.Get("userID")
+	if !exists {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "userID not found in context"})
+
+		return
+	}
+
+	userIDStr, ok := userIDRaw.(string)
+	if !ok {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "userID has wrong type"})
+
+		return
+	}
+
+	userUUID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "invalid userID format"})
+
+		return
+	}
+
+	var req entity.UpdateUserProfileInfoRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+
+		return
+	}
+
+	data, err := h.service.UpdateUserProfile(ctx, userUUID, req)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+
 		return
 	}
 

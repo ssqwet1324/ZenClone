@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"strconv"
+	"strings"
 )
 
 type PostgresRepository struct {
@@ -31,7 +32,9 @@ func New(cfg *config.Config) (*PostgresRepository, error) {
 		return nil, fmt.Errorf("PostgresRepository: Error connecrtion from pgxpool: %v", err)
 	}
 
-	return &PostgresRepository{dbPool}, nil
+	return &PostgresRepository{
+		DB: dbPool,
+	}, nil
 }
 
 // AddUser - добавить пользователя в Бд(для ручки /add-user
@@ -50,6 +53,16 @@ func (repo *PostgresRepository) AddUser(ctx context.Context, addUserInfo entity.
 	}
 
 	return nil
+}
+
+func (repo *PostgresRepository) GetLoginByUserID(ctx context.Context, id uuid.UUID) (string, error) {
+	var login string
+	err := repo.DB.QueryRow(ctx, `SELECT login FROM Users WHERE id = $1`, id).Scan(&login)
+	if err != nil {
+		return "", fmt.Errorf("GetLoginByUserID: Error getting login by user: %v", err)
+	}
+
+	return login, nil
 }
 
 // GetUserInfoByLogin - получаем логин и пароль для ручки /compare-auth-data
@@ -106,4 +119,51 @@ func (repo *PostgresRepository) GetUserProfileByUsername(ctx context.Context, us
 	return &userInfoResponse, nil
 }
 
-//todo добавить обновления профиля
+// UpdateUserProfile обновить данные пользователя
+func (repo *PostgresRepository) UpdateUserProfile(ctx context.Context, id uuid.UUID, updateProfileInfo entity.UpdateUserProfileInfoRequest) error {
+	var setParts []string
+	var args []interface{}
+	argIdx := 1
+
+	if updateProfileInfo.FirstName != nil {
+		setParts = append(setParts, fmt.Sprintf("first_name = $%d", argIdx))
+		args = append(args, *updateProfileInfo.FirstName)
+		argIdx++
+	}
+	if updateProfileInfo.LastName != nil {
+		setParts = append(setParts, fmt.Sprintf("last_name = $%d", argIdx))
+		args = append(args, *updateProfileInfo.LastName)
+		argIdx++
+	}
+	if updateProfileInfo.Bio != nil {
+		setParts = append(setParts, fmt.Sprintf("bio = $%d", argIdx))
+		args = append(args, *updateProfileInfo.Bio)
+		argIdx++
+	}
+	if updateProfileInfo.PasswordNew != nil {
+		setParts = append(setParts, fmt.Sprintf("password = $%d", argIdx))
+		args = append(args, *updateProfileInfo.PasswordNew)
+		argIdx++
+	}
+
+	if updateProfileInfo.Username != nil {
+		setParts = append(setParts, fmt.Sprintf("username = $%d", argIdx))
+		args = append(args, *updateProfileInfo.Username)
+		argIdx++
+	}
+
+	if len(setParts) == 0 {
+		return fmt.Errorf("nothing to update")
+	}
+
+	args = append(args, id)
+
+	query := fmt.Sprintf("UPDATE Users SET %s WHERE id = $%d", strings.Join(setParts, ", "), argIdx)
+
+	_, err := repo.DB.Exec(ctx, query, args...)
+	if err != nil {
+		return fmt.Errorf("UpdateUserProfile: error updating data %w", err)
+	}
+
+	return nil
+}

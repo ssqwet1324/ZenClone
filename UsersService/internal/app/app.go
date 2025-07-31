@@ -3,6 +3,7 @@ package app
 import (
 	"UsersService/internal/config"
 	"UsersService/internal/handler"
+	"UsersService/internal/middleware"
 	"UsersService/internal/migrations"
 	"UsersService/internal/repository"
 	"UsersService/internal/usecase"
@@ -24,6 +25,8 @@ func Run() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	userMiddleware := middleware.JWTAuthMiddleware(cfg)
 
 	repo, err := repository.New(cfg)
 	if err != nil {
@@ -48,6 +51,7 @@ func Run() {
 	server.POST("/get-refresh-token", userHandler.GetRefreshToken)
 	server.POST("/update-refresh-token", userHandler.UpdateRefreshToken)
 	server.GET("/get-user-profile/:username", userHandler.GetProfile) //проверить ручку
+	server.POST("/update-user-info", userMiddleware, userHandler.UpdateProfile)
 
 	if err := server.Run(":8081"); err != nil {
 		log.Fatal(err)
