@@ -10,12 +10,61 @@ services:
       - "5432:5432"
     restart: always
 
+  postpostgres:
+    image: postgres:15-alpine
+    container_name: post_postgres
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    restart: always
+
   redis:
     image: redis:7-alpine
     container_name: redis
     ports:
       - "6379:6379"
     restart: always
+
+  kafka:
+    image: bitnami/kafka:3.7
+    container_name: kafka
+    environment:
+      KAFKA_CFG_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      ALLOW_PLAINTEXT_LISTENER: "yes"
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    restart: always
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    ports:
+      - "8088:8080"
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+    restart: always
+
+  zookeeper:
+    image: bitnami/zookeeper:3.9
+    container_name: zookeeper
+    environment:
+      ALLOW_ANONYMOUS_LOGIN: "yes"
+    ports:
+      - "2181:2181"
+    restart: always
+
 
   usersservice:
     build:
@@ -40,4 +89,17 @@ services:
       - ./AuthService/.env
     ports:
       - "8080:8080"
+    restart: always
+
+  postservice:
+    build:
+      context: ./PostService
+    container_name: postservice
+    depends_on:
+      - postpostgres
+      - kafka
+    env_file:
+      - ./PostService/.env
+    ports:
+      - "8082:8082"
     restart: always
