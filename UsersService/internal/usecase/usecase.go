@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"UsersService/internal/client/PostClient"
 	"UsersService/internal/config"
 	"UsersService/internal/entity"
 	"context"
@@ -21,16 +22,18 @@ type RepositoryProvider interface {
 	UpdateUserProfile(ctx context.Context, id uuid.UUID, updateProfileInfo entity.UpdateUserProfileInfoRequest) error
 }
 type UserService struct {
-	log  *zap.Logger
-	repo RepositoryProvider
-	cfg  *config.Config
+	log    *zap.Logger
+	repo   RepositoryProvider
+	cfg    *config.Config
+	client PostClient.ClientProvider
 }
 
-func New(log *zap.Logger, repo RepositoryProvider, cfg *config.Config) *UserService {
+func New(log *zap.Logger, repo RepositoryProvider, cfg *config.Config, client PostClient.ClientProvider) *UserService {
 	return &UserService{
-		log:  log.Named("usecase"),
-		repo: repo,
-		cfg:  cfg,
+		log:    log.Named("usecase"),
+		repo:   repo,
+		cfg:    cfg,
+		client: client,
 	}
 }
 
@@ -108,6 +111,13 @@ func (s *UserService) GetUserProfileByUsername(ctx context.Context, username str
 	profileInfo.FirstName = info.FirstName
 	profileInfo.LastName = info.LastName
 	profileInfo.Bio = info.Bio
+
+	postData, err := s.client.GetPostsUser(ctx, username)
+	if err != nil {
+		return nil, fmt.Errorf("GetUserProfileByUsername error getting posts: %w", err)
+	}
+
+	profileInfo.Posts = postData
 
 	s.log.Info("GetUserProfileByUsername: success get user profile")
 

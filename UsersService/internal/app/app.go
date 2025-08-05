@@ -1,6 +1,7 @@
 package app
 
 import (
+	"UsersService/internal/client/PostClient"
 	"UsersService/internal/config"
 	"UsersService/internal/handler"
 	"UsersService/internal/middleware"
@@ -9,12 +10,15 @@ import (
 	"UsersService/internal/usecase"
 	"context"
 	"github.com/gin-gonic/gin"
+	"github.com/go-resty/resty/v2"
 	"go.uber.org/zap"
 	"log"
 )
 
 func Run() {
 	server := gin.Default()
+
+	restyClient := resty.New()
 
 	logger, err := zap.NewDevelopment()
 	if err != nil {
@@ -42,7 +46,9 @@ func Run() {
 		log.Fatalf("can't initialize tables: %v", err)
 	}
 
-	usersService := usecase.New(logger, repo, cfg)
+	postClient := PostClient.New(restyClient, logger, cfg.ClientConfig)
+
+	usersService := usecase.New(logger, repo, cfg, postClient)
 
 	userHandler := handler.New(usersService, logger)
 

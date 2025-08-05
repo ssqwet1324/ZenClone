@@ -1,6 +1,9 @@
 package entity
 
-import "github.com/google/uuid"
+import (
+	"UsersService/internal/client/PostClient"
+	"github.com/google/uuid"
+)
 
 type AuthRequest struct {
 	Login    string `json:"login"`
@@ -46,9 +49,10 @@ type RefreshTokenResponse struct {
 
 // ProfileUserInfoResponse - информация о профиле пользователя
 type ProfileUserInfoResponse struct {
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
-	Bio       string `json:"bio"`
+	FirstName string                    `json:"first_name"`
+	LastName  string                    `json:"last_name"`
+	Bio       string                    `json:"bio"`
+	Posts     []PostClient.PostResponse `json:"posts"` // слайс постов
 }
 
 type UpdateUserProfileInfoRequest struct {
