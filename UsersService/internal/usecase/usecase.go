@@ -6,6 +6,7 @@ import (
 	"UsersService/internal/entity"
 	"context"
 	"fmt"
+	"github.com/gin-gonic/gin"
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -112,16 +113,22 @@ func (s *UserService) GetUserProfileByUsername(ctx context.Context, username str
 	profileInfo.LastName = info.LastName
 	profileInfo.Bio = info.Bio
 
-	postData, err := s.client.GetPostsUser(ctx, username)
-	if err != nil {
-		return nil, fmt.Errorf("GetUserProfileByUsername error getting posts: %w", err)
-	}
-
-	profileInfo.Posts = postData
-
 	s.log.Info("GetUserProfileByUsername: success get user profile")
 
 	return &profileInfo, nil
+}
+
+// GetPostsByUsername - получить посты пользователя в его профиле
+func (s *UserService) GetPostsByUsername(ctx *gin.Context, usename string) (*entity.UserPosts, error) {
+	var posts entity.UserPosts
+	data, err := s.client.GetPostsUser(ctx, usename)
+	if err != nil {
+		s.log.Error("GetPostsByUsername: GetPostsByUsername error", zap.Error(err))
+	}
+
+	posts.Posts = data
+
+	return &posts, nil
 }
 
 func (s *UserService) UpdateUserProfile(ctx context.Context, id uuid.UUID, updateProfileInfo entity.UpdateUserProfileInfoRequest) (*entity.UpdateUserProfileInfoResponse, error) {

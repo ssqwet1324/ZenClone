@@ -49,10 +49,9 @@ type RefreshTokenResponse struct {
 
 // ProfileUserInfoResponse - информация о профиле пользователя
 type ProfileUserInfoResponse struct {
-	FirstName string                    `json:"first_name"`
-	LastName  string                    `json:"last_name"`
-	Bio       string                    `json:"bio"`
-	Posts     []PostClient.PostResponse `json:"posts"` // слайс постов
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	Bio       string `json:"bio"`
 }
 
 type UpdateUserProfileInfoRequest struct {
@@ -70,4 +69,8 @@ type UpdateUserProfileInfoResponse struct {
 	FirstName   *string `json:"first_name"`
 	LastName    *string `json:"last_name"`
 	Bio         *string `json:"bio"`
+}
+
+type UserPosts struct {
+	Posts []PostClient.PostResponse `json:"posts"` // слайс постов
 }

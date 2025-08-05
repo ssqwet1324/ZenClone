@@ -56,8 +56,11 @@ func Run() {
 	server.POST("/compare-auth-data", userHandler.CompareAuthPassword)
 	server.POST("/get-refresh-token", userHandler.GetRefreshToken)
 	server.POST("/update-refresh-token", userHandler.UpdateRefreshToken)
-	server.GET("/get-user-profile/:username", userHandler.GetProfile) //проверить ручку
+
+	server.GET("/get-user-profile/:username", userHandler.GetProfile)
 	server.POST("/update-user-info", userMiddleware, userHandler.UpdateProfile)
+
+	server.GET("/users/:username/posts", userHandler.GetPostsByUser)
 
 	if err := server.Run(":8081"); err != nil {
 		log.Fatal(err)
