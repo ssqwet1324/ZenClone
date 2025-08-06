@@ -100,7 +100,7 @@ func (h *UsersHandler) GetProfile(ctx *gin.Context) {
 
 func (h *UsersHandler) GetPostsByUser(ctx *gin.Context) {
 	username := ctx.Param("username")
-	data, err := h.service.GetPostsByUsername(ctx, username)
+	data, err := h.service.GetPostsByUserID(ctx, username)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 

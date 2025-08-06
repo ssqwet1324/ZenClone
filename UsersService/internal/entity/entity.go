@@ -70,7 +70,9 @@ type UpdateUserProfileInfoResponse struct {
 	LastName    *string `json:"last_name"`
 	Bio         *string `json:"bio"`
 }
-
+type UserResponse struct {
+	ID uuid.UUID `json:"id"`
+}
 type UserPosts struct {
 	Posts []PostClient.PostResponse `json:"posts"` // слайс постов
 }

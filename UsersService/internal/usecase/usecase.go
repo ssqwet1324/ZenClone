@@ -21,6 +21,7 @@ type RepositoryProvider interface {
 	GetRefreshTokenByUserID(ctx context.Context, id uuid.UUID) (*entity.RefreshTokenResponse, error)
 	GetUserProfileByUsername(ctx context.Context, username string) (*entity.ProfileUserInfoResponse, error)
 	UpdateUserProfile(ctx context.Context, id uuid.UUID, updateProfileInfo entity.UpdateUserProfileInfoRequest) error
+	GetUserIdByUsername(ctx context.Context, username string) (*entity.UserResponse, error)
 }
 type UserService struct {
 	log    *zap.Logger
@@ -118,12 +119,20 @@ func (s *UserService) GetUserProfileByUsername(ctx context.Context, username str
 	return &profileInfo, nil
 }
 
-// GetPostsByUsername - получить посты пользователя в его профиле
-func (s *UserService) GetPostsByUsername(ctx *gin.Context, usename string) (*entity.UserPosts, error) {
+// GetPostsByUserID - получить посты пользователя в его профиле
+func (s *UserService) GetPostsByUserID(ctx *gin.Context, username string) (*entity.UserPosts, error) {
 	var posts entity.UserPosts
-	data, err := s.client.GetPostsUser(ctx, usename)
+
+	//получаем id пользователя по username
+	userID, err := s.repo.GetUserIdByUsername(ctx, username)
 	if err != nil {
-		s.log.Error("GetPostsByUsername: GetPostsByUsername error", zap.Error(err))
+		return nil, fmt.Errorf("GetUserIdByUsername error getting userIB by username: %w", err)
+	}
+
+	//получаем ответ от PostService
+	data, err := s.client.GetPostsUser(ctx, userID.ID)
+	if err != nil {
+		return nil, fmt.Errorf("GetPostsByUserID error response getting posts: %w", err)
 	}
 
 	posts.Posts = data
