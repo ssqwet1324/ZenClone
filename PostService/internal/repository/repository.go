@@ -136,3 +136,34 @@ func (repo *PostgresRepository) DeletePost(ctx context.Context, postID uuid.UUID
 
 	return nil
 }
+
+func (repo *PostgresRepository) GetPostsUser(ctx context.Context, authorID uuid.UUID) (*entity.PostListResponse, error) {
+	var postList entity.PostListResponse
+
+	rows, err := repo.DB.Query(ctx, `SELECT post_id, title, content, created_at, updated_at FROM Posts WHERE author_id = $1`, authorID)
+	if err != nil {
+		return nil, fmt.Errorf("GetPostsUser: error getting posts: %v", err)
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		var post entity.PostResponse
+		err = rows.Scan(
+			&post.ID,
+			&post.Title,
+			&post.Content,
+			&post.CreatedAt,
+			&post.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("GetPostsUser: error scanning posts: %v", err)
+		}
+
+		postList.Posts = append(postList.Posts, post)
+	}
+
+	repo.log.Info("GetPostsUser: successful getting posts", zap.String("author_id", authorID.String()))
+
+	return &postList, nil
+}

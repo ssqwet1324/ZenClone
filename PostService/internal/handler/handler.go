@@ -119,3 +119,22 @@ func (h *PostHandler) DeletePost(ctx *gin.Context) {
 	}
 	ctx.JSON(http.StatusOK, gin.H{"post deleted": postID})
 }
+
+func (h *PostHandler) GetPostsUser(ctx *gin.Context) {
+	userID := ctx.Param("userID")
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+
+		return
+	}
+
+	data, err := h.usecase.GetPostsUser(ctx, userUUID)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"posts": data.Posts})
+}

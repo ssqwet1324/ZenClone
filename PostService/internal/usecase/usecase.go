@@ -14,6 +14,7 @@ type RepositoryProvider interface {
 	CreatePost(ctx context.Context, createPost entity.CreatePostRequest) (*entity.CreatePostResponse, error)
 	UpdatePost(ctx context.Context, postID uuid.UUID, authorID uuid.UUID, updateReq entity.UpdateUserPostRequest) (*entity.UpdateUserPostResponse, error)
 	DeletePost(ctx context.Context, postID uuid.UUID, userID uuid.UUID) error
+	GetPostsUser(ctx context.Context, authorID uuid.UUID) (*entity.PostListResponse, error)
 }
 
 type PostUseCase struct {
@@ -86,4 +87,17 @@ func (s *PostUseCase) DeletePost(ctx context.Context, postID uuid.UUID, userID u
 	}
 
 	return nil
+}
+
+func (s *PostUseCase) GetPostsUser(ctx context.Context, authorID uuid.UUID) (*entity.PostListResponse, error) {
+	rows, err := s.repo.GetPostsUser(ctx, authorID)
+	if err != nil {
+		return nil, fmt.Errorf("GetPostsUser usecase: error get posts user: %w", err)
+	}
+
+	if rows.Posts == nil {
+		return &entity.PostListResponse{}, fmt.Errorf("GetPostsUser usecase: posts user not found")
+	}
+
+	return rows, nil
 }

@@ -52,6 +52,7 @@ func Run() {
 	server.POST("/create-post", postHandler.CreatePost)
 	server.POST("/update-post/:postID", userMiddleware, postHandler.UpdatePost)
 	server.DELETE("/delete-post/:postID", userMiddleware, postHandler.DeletePost)
+	server.GET("/posts/by-user/:userID", postHandler.GetPostsUser)
 
 	if err := server.Run(":8082"); err != nil {
 		log.Fatal(err)
