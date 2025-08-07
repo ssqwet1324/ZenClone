@@ -1,7 +1,6 @@
 package entity
 
 import (
-	"UsersService/internal/client/PostClient"
 	"github.com/google/uuid"
 )
 
@@ -72,7 +71,4 @@ type UpdateUserProfileInfoResponse struct {
 }
 type UserResponse struct {
 	ID uuid.UUID `json:"id"`
-}
-type UserPosts struct {
-	Posts []PostClient.PostResponse `json:"posts"` // слайс постов
 }

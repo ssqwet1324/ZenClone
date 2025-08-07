@@ -119,20 +119,6 @@ func (repo *PostgresRepository) GetUserProfileByUsername(ctx context.Context, us
 	return &userInfoResponse, nil
 }
 
-func (repo *PostgresRepository) GetUserIdByUsername(ctx context.Context, username string) (*entity.UserResponse, error) {
-	var userIDResponse entity.UserResponse
-	err := repo.DB.QueryRow(ctx, `SELECT id FROM users WHERE username = $1`, username).Scan(&userIDResponse.ID)
-	if err != nil {
-		return nil, fmt.Errorf("GetUserIdByUsername: Error getting user information: %v", err)
-	}
-
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, fmt.Errorf("GetUserIdByUsername: User not found")
-	}
-
-	return &userIDResponse, nil
-}
-
 // UpdateUserProfile обновить данные пользователя
 func (repo *PostgresRepository) UpdateUserProfile(ctx context.Context, id uuid.UUID, updateProfileInfo entity.UpdateUserProfileInfoRequest) error {
 	var setParts []string
@@ -180,4 +166,19 @@ func (repo *PostgresRepository) UpdateUserProfile(ctx context.Context, id uuid.U
 	}
 
 	return nil
+}
+
+// GetUserIdByUsername - получить ID по username
+func (repo *PostgresRepository) GetUserIdByUsername(ctx context.Context, username string) (*entity.UserResponse, error) {
+	var userIDResponse entity.UserResponse
+	err := repo.DB.QueryRow(ctx, `SELECT id FROM users WHERE username = $1`, username).Scan(&userIDResponse.ID)
+	if err != nil {
+		return nil, fmt.Errorf("GetUserIdByUsername: Error getting user information: %v", err)
+	}
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, fmt.Errorf("GetUserIdByUsername: User not found")
+	}
+
+	return &userIDResponse, nil
 }

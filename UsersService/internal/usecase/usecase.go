@@ -1,13 +1,10 @@
 package usecase
 
 import (
-	"UsersService/internal/client/PostClient"
 	"UsersService/internal/config"
 	"UsersService/internal/entity"
 	"context"
 	"fmt"
-	"github.com/gin-gonic/gin"
-
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
@@ -24,18 +21,16 @@ type RepositoryProvider interface {
 	GetUserIdByUsername(ctx context.Context, username string) (*entity.UserResponse, error)
 }
 type UserService struct {
-	log    *zap.Logger
-	repo   RepositoryProvider
-	cfg    *config.Config
-	client PostClient.ClientProvider
+	log  *zap.Logger
+	repo RepositoryProvider
+	cfg  *config.Config
 }
 
-func New(log *zap.Logger, repo RepositoryProvider, cfg *config.Config, client PostClient.ClientProvider) *UserService {
+func New(log *zap.Logger, repo RepositoryProvider, cfg *config.Config) *UserService {
 	return &UserService{
-		log:    log.Named("usecase"),
-		repo:   repo,
-		cfg:    cfg,
-		client: client,
+		log:  log.Named("usecase"),
+		repo: repo,
+		cfg:  cfg,
 	}
 }
 
@@ -119,25 +114,15 @@ func (s *UserService) GetUserProfileByUsername(ctx context.Context, username str
 	return &profileInfo, nil
 }
 
-// GetPostsByUserID - получить посты пользователя в его профиле
-func (s *UserService) GetPostsByUserID(ctx *gin.Context, username string) (*entity.UserPosts, error) {
-	var posts entity.UserPosts
-
-	//получаем id пользователя по username
+func (s *UserService) GetIdByUsername(ctx context.Context, username string) (*entity.UserResponse, error) {
+	var user entity.UserResponse
 	userID, err := s.repo.GetUserIdByUsername(ctx, username)
 	if err != nil {
-		return nil, fmt.Errorf("GetUserIdByUsername error getting userIB by username: %w", err)
+		return nil, fmt.Errorf("GetUserIdByUsername error getting id by username: %w", err)
 	}
+	user.ID = userID.ID
 
-	//получаем ответ от PostService
-	data, err := s.client.GetPostsUser(ctx, userID.ID)
-	if err != nil {
-		return nil, fmt.Errorf("GetPostsByUserID error response getting posts: %w", err)
-	}
-
-	posts.Posts = data
-
-	return &posts, nil
+	return &user, nil
 }
 
 func (s *UserService) UpdateUserProfile(ctx context.Context, id uuid.UUID, updateProfileInfo entity.UpdateUserProfileInfoRequest) (*entity.UpdateUserProfileInfoResponse, error) {

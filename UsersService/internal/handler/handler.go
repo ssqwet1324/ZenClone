@@ -98,17 +98,6 @@ func (h *UsersHandler) GetProfile(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, data)
 }
 
-func (h *UsersHandler) GetPostsByUser(ctx *gin.Context) {
-	username := ctx.Param("username")
-	data, err := h.service.GetPostsByUserID(ctx, username)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-
-		return
-	}
-	ctx.JSON(http.StatusOK, data)
-}
-
 func (h *UsersHandler) UpdateProfile(ctx *gin.Context) {
 	userIDRaw, exists := ctx.Get("userID")
 	if !exists {
@@ -145,5 +134,16 @@ func (h *UsersHandler) UpdateProfile(ctx *gin.Context) {
 		return
 	}
 
+	ctx.JSON(http.StatusOK, data)
+}
+
+func (h *UsersHandler) GetUserIDByUsername(ctx *gin.Context) {
+	username := ctx.Param("username")
+	data, err := h.service.GetIdByUsername(ctx.Request.Context(), username)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+
+		return
+	}
 	ctx.JSON(http.StatusOK, data)
 }

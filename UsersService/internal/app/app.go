@@ -1,7 +1,6 @@
 package app
 
 import (
-	"UsersService/internal/client/PostClient"
 	"UsersService/internal/config"
 	"UsersService/internal/handler"
 	"UsersService/internal/middleware"
@@ -10,15 +9,12 @@ import (
 	"UsersService/internal/usecase"
 	"context"
 	"github.com/gin-gonic/gin"
-	"github.com/go-resty/resty/v2"
 	"go.uber.org/zap"
 	"log"
 )
 
 func Run() {
 	server := gin.Default()
-
-	restyClient := resty.New()
 
 	logger, err := zap.NewDevelopment()
 	if err != nil {
@@ -46,9 +42,7 @@ func Run() {
 		log.Fatalf("can't initialize tables: %v", err)
 	}
 
-	postClient := PostClient.New(restyClient, logger, cfg.ClientConfig)
-
-	usersService := usecase.New(logger, repo, cfg, postClient)
+	usersService := usecase.New(logger, repo, cfg)
 
 	userHandler := handler.New(usersService, logger)
 
@@ -60,7 +54,7 @@ func Run() {
 	server.GET("/get-user-profile/:username", userHandler.GetProfile)
 	server.POST("/update-user-info", userMiddleware, userHandler.UpdateProfile)
 
-	server.GET("/users/:username/posts", userHandler.GetPostsByUser)
+	server.GET("/users/api/user/:username", userHandler.GetUserIDByUsername)
 
 	if err := server.Run(":8081"); err != nil {
 		log.Fatal(err)
