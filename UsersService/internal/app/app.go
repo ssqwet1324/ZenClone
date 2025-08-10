@@ -27,6 +27,9 @@ func Run() {
 	}
 
 	userMiddleware := middleware.JWTAuthMiddleware(cfg)
+	if userMiddleware == nil {
+		log.Fatal("JWT middleware initialization failed")
+	}
 
 	repo, err := repository.New(cfg)
 	if err != nil {
@@ -42,19 +45,29 @@ func Run() {
 		log.Fatalf("can't initialize tables: %v", err)
 	}
 
-	usersService := usecase.New(logger, repo, cfg)
+	usersService := usecase.New(repo, cfg)
 
 	userHandler := handler.New(usersService, logger)
 
-	server.POST("/add-user", userHandler.AddUser)
-	server.POST("/compare-auth-data", userHandler.CompareAuthPassword)
-	server.POST("/get-refresh-token", userHandler.GetRefreshToken)
-	server.POST("/update-refresh-token", userHandler.UpdateRefreshToken)
+	apiV1 := server.Group("/api/v1")
+	{
+		apiV1.GET("/get-user-profile/:username", userHandler.GetProfile)
+		apiV1.GET("/user/:username", userHandler.GetUserIDByUsername)
+		apiV1.GET("/user/subs/:username", userHandler.GetSubsUser)
 
-	server.GET("/get-user-profile/:username", userHandler.GetProfile)
-	server.POST("/update-user-info", userMiddleware, userHandler.UpdateProfile)
+		apiV1.POST("/update-user-info", userMiddleware, userHandler.UpdateProfile)
+		apiV1.POST("/user/subscribe/:username", userMiddleware, userHandler.Subscribe)
+		apiV1.POST("/user/unsubscribe/:username", userMiddleware, userHandler.UnsubscribeFromUser)
 
-	server.GET("/users/api/user/:username", userHandler.GetUserIDByUsername)
+	}
+
+	internalApi := server.Group("/internal")
+	{
+		internalApi.POST("/add-user", userHandler.AddUser)
+		internalApi.POST("/compare-auth-data", userHandler.CompareAuthPassword)
+		internalApi.POST("/get-refresh-token", userHandler.GetRefreshToken)
+		internalApi.POST("/update-refresh-token", userHandler.UpdateRefreshToken)
+	}
 
 	if err := server.Run(":8081"); err != nil {
 		log.Fatal(err)

@@ -22,17 +22,27 @@ func New(repo *repository.PostgresRepository, log *zap.Logger) *Migration {
 }
 
 func (m *Migration) InitTables(ctx context.Context) error {
-	query := `CREATE TABLE IF NOT EXISTS users (
+	query := `
+CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY,
     login VARCHAR NOT NULL UNIQUE,
     password VARCHAR(100) NOT NULL,
     refresh_token VARCHAR,
     username VARCHAR NOT NULL UNIQUE, 
     first_name VARCHAR NOT NULL,
-    last_name VARCHAR NUll,
-    bio TEXT NULL,
+    last_name VARCHAR,
+    bio TEXT,
     created_at TIMESTAMP DEFAULT now()
-)`
+);
+
+CREATE TABLE IF NOT EXISTS subscriptions (
+    follower_id UUID NOT NULL,
+    following_id UUID NOT NULL,
+    PRIMARY KEY (follower_id, following_id),
+    FOREIGN KEY (follower_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (following_id) REFERENCES users(id) ON DELETE CASCADE
+);
+`
 	maxRetries := 5
 	retryDelay := 5 * time.Second
 
@@ -42,9 +52,9 @@ func (m *Migration) InitTables(ctx context.Context) error {
 			return nil
 		}
 
-		m.log.Warn("Migrations: Failed to init users table", zap.Error(err))
+		m.log.Warn("Migrations: Failed to init tables", zap.Error(err))
 		time.Sleep(retryDelay)
 	}
 
-	return fmt.Errorf("неудалось создать таблицу после %d попыток", maxRetries)
+	return fmt.Errorf("не удалось создать таблицы после %d попыток", maxRetries)
 }

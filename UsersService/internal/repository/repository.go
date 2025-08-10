@@ -46,7 +46,7 @@ func (repo *PostgresRepository) AddUser(ctx context.Context, addUserInfo entity.
 		addUserInfo.Username,
 		addUserInfo.FirstName,
 		addUserInfo.LastName,
-		addUserInfo.Bio, //убрать надо будет т.к чтобы о себе сразу не писать нечего
+		addUserInfo.Bio,
 	)
 	if err != nil {
 		return fmt.Errorf("AddUser: Error adding user in DB: %v", err)
@@ -55,6 +55,7 @@ func (repo *PostgresRepository) AddUser(ctx context.Context, addUserInfo entity.
 	return nil
 }
 
+// GetLoginByUserID - получаем логин по id пользователя
 func (repo *PostgresRepository) GetLoginByUserID(ctx context.Context, id uuid.UUID) (string, error) {
 	var login string
 	err := repo.DB.QueryRow(ctx, `SELECT login FROM Users WHERE id = $1`, id).Scan(&login)
@@ -69,13 +70,13 @@ func (repo *PostgresRepository) GetLoginByUserID(ctx context.Context, id uuid.UU
 func (repo *PostgresRepository) GetUserInfoByLogin(ctx context.Context, login string) (*entity.LoginResponse, error) {
 	var userInfo entity.LoginResponse
 
-	err := repo.DB.QueryRow(ctx, `SELECT id, password FROM Users WHERE login= $1`, login).Scan(&userInfo.ID, &userInfo.Password)
-	if err != nil {
-		return nil, fmt.Errorf("GetUserInfo: Error getting user information: %v", err)
-	}
-
+	err := repo.DB.QueryRow(ctx, `SELECT id, password FROM Users WHERE login = $1`, login).Scan(&userInfo.ID, &userInfo.Password)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, fmt.Errorf("GetUserInfo: User not found")
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("GetUserInfo: Error getting user information: %v", err)
 	}
 
 	return &userInfo, nil
@@ -181,4 +182,62 @@ func (repo *PostgresRepository) GetUserIdByUsername(ctx context.Context, usernam
 	}
 
 	return &userIDResponse, nil
+}
+
+// SubscribeFromUser - подписаться на пользователя
+func (repo *PostgresRepository) SubscribeFromUser(ctx context.Context, followerID, followingID uuid.UUID) error {
+	rows, err := repo.DB.Exec(ctx, `INSERT INTO subscriptions (follower_id, following_id) VALUES ($1, $2)`, followerID, followingID)
+	if err != nil {
+		return fmt.Errorf("CreateSubToUser: error inserting subscription: %w", err)
+	}
+
+	if rows.RowsAffected() != 1 {
+		return fmt.Errorf("CreateSubToUser: expected to insert 1 row, but inserted %d", rows.RowsAffected())
+	}
+
+	return nil
+}
+
+// GetSubsUser - получить подписки пользователя
+func (repo *PostgresRepository) GetSubsUser(ctx context.Context, userID uuid.UUID) (*entity.SubsList, error) {
+	var subList entity.SubsList
+
+	rows, err := repo.DB.Query(ctx, `
+		SELECT users.id, users.username, users.first_name, users.last_name
+		FROM subscriptions
+		JOIN users ON subscriptions.following_id = users.id
+		WHERE subscriptions.follower_id = $1
+	`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("GetSubsUser: error executing query: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var sub entity.SubUserInfo
+		if err := rows.Scan(&sub.ID, &sub.Username, &sub.FirstName, &sub.LastName); err != nil {
+			return nil, fmt.Errorf("GetSubsUser: error scanning row: %w", err)
+		}
+		subList.Subs = append(subList.Subs, sub)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("GetSubsUser: rows iteration error: %w", err)
+	}
+
+	return &subList, nil
+}
+
+// UnsubscribeFromUser - отписаться от пользователя
+func (repo *PostgresRepository) UnsubscribeFromUser(ctx context.Context, followerID, followingID uuid.UUID) error {
+	row, err := repo.DB.Exec(ctx, `DELETE FROM subscriptions WHERE follower_id = $1 AND following_id = $2`, followerID, followingID)
+	if err != nil {
+		return fmt.Errorf("DeleteSub: error executing delete: %w", err)
+	}
+
+	if row.RowsAffected() == 0 {
+		return fmt.Errorf("DeleteSub: no subscription found to delete")
+	}
+
+	return nil
 }

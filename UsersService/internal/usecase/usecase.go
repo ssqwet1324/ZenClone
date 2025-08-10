@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/google/uuid"
-	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -19,16 +18,17 @@ type RepositoryProvider interface {
 	GetUserProfileByUsername(ctx context.Context, username string) (*entity.ProfileUserInfoResponse, error)
 	UpdateUserProfile(ctx context.Context, id uuid.UUID, updateProfileInfo entity.UpdateUserProfileInfoRequest) error
 	GetUserIdByUsername(ctx context.Context, username string) (*entity.UserResponse, error)
+	SubscribeFromUser(ctx context.Context, followerID, followingID uuid.UUID) error
+	GetSubsUser(ctx context.Context, userID uuid.UUID) (*entity.SubsList, error)
+	UnsubscribeFromUser(ctx context.Context, followerID, followingID uuid.UUID) error
 }
 type UserService struct {
-	log  *zap.Logger
 	repo RepositoryProvider
 	cfg  *config.Config
 }
 
-func New(log *zap.Logger, repo RepositoryProvider, cfg *config.Config) *UserService {
+func New(repo RepositoryProvider, cfg *config.Config) *UserService {
 	return &UserService{
-		log:  log.Named("usecase"),
 		repo: repo,
 		cfg:  cfg,
 	}
@@ -39,8 +39,6 @@ func (s *UserService) AddUser(ctx context.Context, addUserInfo entity.AddUserReq
 	if err != nil {
 		return fmt.Errorf("AddUser: error add login and hash %w", err)
 	}
-
-	s.log.Info("AddUser: Success add user")
 
 	return nil
 }
@@ -59,11 +57,8 @@ func (s *UserService) CompareAuthData(ctx context.Context, users entity.AuthRequ
 
 	err = bcrypt.CompareHashAndPassword([]byte(response.Password), []byte(users.Password))
 	if err != nil {
-		s.log.Info("CompareAuthData error", zap.Error(err))
 		return nil, fmt.Errorf("неверный пароль: %w", err)
 	}
-
-	s.log.Info("CompareAuthData success compare auth data")
 
 	return &compareData, nil
 }
@@ -79,8 +74,6 @@ func (s *UserService) GetRefreshToken(ctx context.Context, id uuid.UUID) (*entit
 
 	tokenResponse.RefreshToken = response.RefreshToken
 
-	s.log.Info("GetRefreshToken: success get refresh token")
-
 	return &tokenResponse, nil
 }
 
@@ -91,30 +84,15 @@ func (s *UserService) UpdateRefreshToken(ctx context.Context, req entity.UpdateR
 		return fmt.Errorf("UpdateRefreshToken: error updating refresh token %w", err)
 	}
 
-	s.log.Info("UpdateRefreshToken: success update refresh token")
-
 	return nil
 }
 
 // GetUserProfileByUsername - получить информацию по профилю пользователя
 func (s *UserService) GetUserProfileByUsername(ctx context.Context, username string) (*entity.ProfileUserInfoResponse, error) {
-	var profileInfo entity.ProfileUserInfoResponse
-
-	info, err := s.repo.GetUserProfileByUsername(ctx, username)
-	if err != nil {
-		return nil, fmt.Errorf("GetUserProfileByUsername error: %w", err)
-	}
-
-	profileInfo.FirstName = info.FirstName
-	profileInfo.LastName = info.LastName
-	profileInfo.Bio = info.Bio
-
-	s.log.Info("GetUserProfileByUsername: success get user profile")
-
-	return &profileInfo, nil
+	return s.repo.GetUserProfileByUsername(ctx, username)
 }
 
-func (s *UserService) GetIdByUsername(ctx context.Context, username string) (*entity.UserResponse, error) {
+func (s *UserService) GetUserIDByUsername(ctx context.Context, username string) (*entity.UserResponse, error) {
 	var user entity.UserResponse
 	userID, err := s.repo.GetUserIdByUsername(ctx, username)
 	if err != nil {
@@ -126,7 +104,6 @@ func (s *UserService) GetIdByUsername(ctx context.Context, username string) (*en
 }
 
 func (s *UserService) UpdateUserProfile(ctx context.Context, id uuid.UUID, updateProfileInfo entity.UpdateUserProfileInfoRequest) (*entity.UpdateUserProfileInfoResponse, error) {
-
 	login, err := s.repo.GetLoginByUserID(ctx, id)
 
 	// тут сверяем пароли
@@ -174,4 +151,55 @@ func (s *UserService) UpdateUserProfile(ctx context.Context, id uuid.UUID, updat
 	}
 
 	return &response, nil
+}
+
+// SubscribeToUser - подписаться на пользователя
+func (s *UserService) SubscribeToUser(ctx context.Context, followerID uuid.UUID, username string) error {
+	fmt.Println(followerID, username)
+	followingID, err := s.repo.GetUserIdByUsername(ctx, username)
+	if err != nil {
+		return fmt.Errorf("GetUserIdByUsername error: %w", err)
+	}
+	fmt.Println(followerID, followingID)
+
+	err = s.repo.SubscribeFromUser(ctx, followerID, followingID.ID)
+	if err != nil {
+		return fmt.Errorf("CreateSubToUser usecase  error: %w", err)
+	}
+
+	return nil
+}
+
+// GetSubsUser - получить подписки пользователя
+func (s *UserService) GetSubsUser(ctx context.Context, username string) (*entity.SubsList, error) {
+	targetUserID, err := s.repo.GetUserIdByUsername(ctx, username)
+	if err != nil {
+		return nil, fmt.Errorf("GetUserIdByUsername error: %w", err)
+	}
+
+	data, err := s.repo.GetSubsUser(ctx, targetUserID.ID)
+	if err != nil {
+		return nil, fmt.Errorf("GetSubsUser error: %w", err)
+	}
+
+	if data == nil {
+		return nil, fmt.Errorf("GetSubsUser data is nil")
+	}
+
+	return data, nil
+}
+
+// UnsubscribeFromUser - отписаться от пользователя
+func (s *UserService) UnsubscribeFromUser(ctx context.Context, followerID uuid.UUID, targetUsername string) error {
+	targetUserID, err := s.repo.GetUserIdByUsername(ctx, targetUsername)
+	if err != nil {
+		return fmt.Errorf("UnsubscribeFromUser error: %w", err)
+	}
+
+	err = s.repo.UnsubscribeFromUser(ctx, followerID, targetUserID.ID)
+	if err != nil {
+		return fmt.Errorf("UnsubscribeFromUser error: %w", err)
+	}
+
+	return nil
 }

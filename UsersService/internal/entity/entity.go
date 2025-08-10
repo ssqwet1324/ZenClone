@@ -72,3 +72,14 @@ type UpdateUserProfileInfoResponse struct {
 type UserResponse struct {
 	ID uuid.UUID `json:"id"`
 }
+
+type SubUserInfo struct {
+	ID        uuid.UUID `json:"id"`
+	Username  string    `json:"username"`
+	FirstName string    `json:"first_name"`
+	LastName  string    `json:"last_name"`
+}
+
+type SubsList struct {
+	Subs []SubUserInfo `json:"subs"`
+}

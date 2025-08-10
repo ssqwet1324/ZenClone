@@ -8,6 +8,7 @@ import (
 	"strings"
 )
 
+// JWTAuthMiddleware - middleware для сервиса
 func JWTAuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
