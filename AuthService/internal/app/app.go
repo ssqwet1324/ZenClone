@@ -35,9 +35,12 @@ func Run() {
 
 	authHandler := handler.New(authService, logger, cfg, client)
 
-	server.POST("/register", authHandler.Register)
-	server.POST("/login", authHandler.Login)
-	server.POST("/refresh", authHandler.Refresh)
+	apiV1 := server.Group("/api/v1/auth")
+	{
+		apiV1.POST("/register", authHandler.Register)
+		apiV1.POST("/login", authHandler.Login)
+		apiV1.POST("/refresh", authHandler.Refresh)
+	}
 
 	if err := server.Run(":8080"); err != nil {
 		log.Fatal(err)

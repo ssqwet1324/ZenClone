@@ -10,10 +10,10 @@ import (
 )
 
 const (
-	addUser            = "/add-user"
-	compareAuthData    = "/compare-auth-data"
-	getRefreshToken    = "/get-refresh-token"
-	updateRefreshToken = "/update-refresh-token"
+	addUser            = "/internal/add-user"
+	compareAuthData    = "/internal/compare-auth-data"
+	getRefreshToken    = "/internal/get-refresh-token"
+	updateRefreshToken = "/internal/update-refresh-token"
 )
 
 type ClientProvider interface {
@@ -42,7 +42,10 @@ func New(client *resty.Client, log *zap.Logger, cfg *ConfigUsersServiceClient) C
 }
 
 func (c *clientService) AddUser(ctx context.Context, userData RegisterRequest) error {
-	response, err := c.client.R().SetContext(ctx).SetBody(userData).Post(c.baseUrl + addUser)
+	response, err := c.client.R().
+		SetContext(ctx).
+		SetBody(userData).
+		Post(c.baseUrl + addUser)
 
 	if err != nil {
 		return fmt.Errorf("AddUser: %w", err)
@@ -57,7 +60,10 @@ func (c *clientService) AddUser(ctx context.Context, userData RegisterRequest) e
 
 func (c *clientService) CompareAuthData(ctx context.Context, userData AuthRequest) (string, error) {
 	var authResponse AuthResponse
-	response, err := c.client.R().SetContext(ctx).SetBody(userData).Post(c.baseUrl + compareAuthData)
+	response, err := c.client.R().
+		SetContext(ctx).
+		SetBody(userData).
+		Post(c.baseUrl + compareAuthData)
 
 	if err != nil {
 		return "", fmt.Errorf("CompareAuthData: %w", err)
@@ -66,8 +72,6 @@ func (c *clientService) CompareAuthData(ctx context.Context, userData AuthReques
 	if response.IsError() {
 		return "", fmt.Errorf("CompareAuthData: %s", response.Body())
 	}
-
-	fmt.Println("AuthResponse client:", string(response.Body()))
 
 	if err := json.Unmarshal(response.Body(), &authResponse); err != nil {
 		return "", fmt.Errorf("CompareAuthData: failed to parse response: %w", err)
