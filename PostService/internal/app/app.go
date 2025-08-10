@@ -49,10 +49,13 @@ func Run() {
 
 	postHandler := handler.New(postService)
 
-	server.POST("/create-post", postHandler.CreatePost)
-	server.POST("/update-post/:postID", userMiddleware, postHandler.UpdatePost)
-	server.DELETE("/delete-post/:postID", userMiddleware, postHandler.DeletePost)
-	server.GET("/posts/by-user/:userID", postHandler.GetPostsUser)
+	apiV1 := server.Group("/api/v1/posts")
+	{
+		apiV1.POST("/create", userMiddleware, postHandler.CreatePost)
+		apiV1.POST("/update/:postID", userMiddleware, postHandler.UpdatePost)
+		apiV1.DELETE("/delete/:postID", userMiddleware, postHandler.DeletePost)
+		apiV1.GET("/by-user/:userID", postHandler.GetPostsUser)
+	}
 
 	if err := server.Run(":8082"); err != nil {
 		log.Fatal(err)

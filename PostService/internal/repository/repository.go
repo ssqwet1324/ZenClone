@@ -44,13 +44,15 @@ func New(cfg *config.Config, log *zap.Logger) (*PostgresRepository, error) {
 }
 
 // CreatePost - создать пост
-func (repo *PostgresRepository) CreatePost(ctx context.Context, createPost entity.CreatePostRequest) (*entity.CreatePostResponse, error) {
+func (repo *PostgresRepository) CreatePost(ctx context.Context, createPost entity.CreatePostResponse) (*entity.CreatePostResponse, error) {
 	var postResponse entity.CreatePostResponse
+
 	err := repo.DB.QueryRow(ctx,
 		`INSERT INTO Posts (post_id, title, content, author_id)
 		 VALUES ($1, $2, $3, $4)
 		 RETURNING post_id, title, content, author_id, created_at`,
 		createPost.ID,
+
 		createPost.Title,
 		createPost.Content,
 		createPost.AuthorID,
@@ -92,7 +94,7 @@ func (repo *PostgresRepository) UpdatePost(ctx context.Context, postID uuid.UUID
 	args = append(args, time.Now())
 	argIdx++
 
-	// postID и authorID для условия WHERE
+	// postID и authorID
 	args = append(args, postID)
 	postIDArgIdx := argIdx
 	argIdx++
@@ -137,6 +139,7 @@ func (repo *PostgresRepository) DeletePost(ctx context.Context, postID uuid.UUID
 	return nil
 }
 
+// GetPostsUser - получить посты пользователя
 func (repo *PostgresRepository) GetPostsUser(ctx context.Context, authorID uuid.UUID) (*entity.PostListResponse, error) {
 	var postList entity.PostListResponse
 

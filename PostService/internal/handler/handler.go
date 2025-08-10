@@ -17,6 +17,27 @@ func New(usecase *usecase.PostUseCase) *PostHandler {
 }
 
 func (h *PostHandler) CreatePost(ctx *gin.Context) {
+	userIDRaw, exists := ctx.Get("userID")
+	if !exists {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "userID not found in context"})
+
+		return
+	}
+
+	userIDStr, ok := userIDRaw.(string)
+	if !ok {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "userID has wrong type"})
+
+		return
+	}
+
+	userUUID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "invalid userID format"})
+
+		return
+	}
+
 	var req entity.CreatePostRequest
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -25,14 +46,14 @@ func (h *PostHandler) CreatePost(ctx *gin.Context) {
 		return
 	}
 
-	postID, err := h.usecase.CreatePost(ctx, req)
+	postID, err := h.usecase.CreatePost(ctx, userUUID, req)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{"id": postID.String()})
+	ctx.JSON(http.StatusOK, gin.H{"id": postID.ID.String()})
 }
 
 func (h *PostHandler) UpdatePost(ctx *gin.Context) {
@@ -116,6 +137,8 @@ func (h *PostHandler) DeletePost(ctx *gin.Context) {
 	err = h.usecase.DeletePost(ctx, postIdUUID, userUUID)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+
+		return
 	}
 	ctx.JSON(http.StatusOK, gin.H{"post deleted": postID})
 }

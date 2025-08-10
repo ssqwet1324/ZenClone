@@ -6,18 +6,15 @@ import (
 )
 
 type CreatePostRequest struct {
-	ID        uuid.UUID `json:"id"`
-	Title     string    `json:"title"`
-	Content   string    `json:"content"`
-	AuthorID  string    `json:"author_id"` // Если что махнуть на username
-	CreatedAt time.Time `json:"created_at"`
+	Title   string `json:"title"`
+	Content string `json:"content"`
 }
 
 type CreatePostResponse struct {
 	ID        uuid.UUID `json:"id"`
 	Title     string    `json:"title"`
 	Content   string    `json:"content"`
-	AuthorID  string    `json:"author_id"`
+	AuthorID  uuid.UUID `json:"author_id"`
 	CreatedAt time.Time `json:"created_at"`
 }
 

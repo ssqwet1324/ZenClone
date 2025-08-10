@@ -4,9 +4,8 @@ import (
 	"PostService/internal/repository"
 	"context"
 	"fmt"
-	"time"
-
 	"go.uber.org/zap"
+	"time"
 )
 
 type Migration struct {
