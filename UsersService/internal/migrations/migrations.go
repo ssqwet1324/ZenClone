@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS users (
     first_name VARCHAR NOT NULL,
     last_name VARCHAR,
     bio TEXT,
+    avatar_url TEXT NOT NULL DEFAULT 'default',
     created_at TIMESTAMP DEFAULT now()
 );
 

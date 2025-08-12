@@ -6,8 +6,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
+	"mime/multipart"
 	"net/http"
 )
+
+const maxAvatarSize = 50 * 1024 * 1024
 
 type UsersHandler struct {
 	service *usecase.UserService
@@ -107,7 +110,7 @@ func (h *UsersHandler) GetProfile(ctx *gin.Context) {
 	username := ctx.Param("username")
 	h.log.Info("GetProfile: start", zap.String("username", username))
 
-	data, err := h.service.GetUserProfileByUsername(ctx.Request.Context(), username)
+	data, err := h.service.GetUserProfileByUsername(ctx, username)
 	if err != nil {
 		h.log.Error("GetProfile: service error", zap.String("username", username), zap.Error(err))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -274,4 +277,78 @@ func (h *UsersHandler) UnsubscribeFromUser(ctx *gin.Context) {
 
 	h.log.Info("UnsubscribeFromUser: success", zap.String("follower_id", userUUID.String()), zap.String("target_username", username))
 	ctx.JSON(http.StatusOK, gin.H{"message": "user unsubscribed"})
+}
+
+func (h *UsersHandler) UploadAvatar(ctx *gin.Context) {
+	userIDRaw, exists := ctx.Get("userID")
+	if !exists {
+		h.log.Warn("UploadAvatar: userID not found in context")
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "userID not found in context"})
+
+		return
+	}
+
+	userIDStr, ok := userIDRaw.(string)
+	if !ok {
+		h.log.Warn("UploadAvatar: userID has wrong type")
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "userID has wrong type"})
+
+		return
+	}
+
+	userUUID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		h.log.Warn("UploadAvatar: invalid userID format", zap.String("userID", userIDStr), zap.Error(err))
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "invalid userID format"})
+
+		return
+	}
+
+	file, err := ctx.FormFile("avatar")
+	if err != nil {
+		h.log.Warn("UploadAvatar: error getting file from form", zap.Error(err))
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "avatar file is required"})
+
+		return
+	}
+
+	// Открываем файл
+	srcFile, err := file.Open()
+	if err != nil {
+		h.log.Warn("UploadAvatar: error opening uploaded file", zap.Error(err))
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "cannot open uploaded file"})
+
+		return
+	}
+	defer func(srcFile multipart.File) {
+		err := srcFile.Close()
+		if err != nil {
+			h.log.Warn("UploadAvatar: error closing uploaded file", zap.Error(err))
+
+			return
+		}
+	}(srcFile)
+
+	if file.Size > maxAvatarSize {
+		h.log.Warn("UploadAvatar: file too large", zap.Int64("size", file.Size))
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "avatar size must be <= 50MB"})
+
+		return
+	}
+
+	avatarReq := entity.AvatarRequest{
+		Name:   file.Filename,
+		Size:   file.Size,
+		Reader: srcFile,
+	}
+
+	err = h.service.UploadAvatar(ctx, userUUID, avatarReq)
+	if err != nil {
+		h.log.Warn("UploadAvatar: error uploading avatar", zap.Error(err))
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "failed to upload avatar"})
+
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"message": "avatar uploaded successfully"})
 }

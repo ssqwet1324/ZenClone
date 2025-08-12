@@ -2,6 +2,7 @@ package entity
 
 import (
 	"github.com/google/uuid"
+	"io"
 )
 
 type AuthRequest struct {
@@ -48,9 +49,10 @@ type RefreshTokenResponse struct {
 
 // ProfileUserInfoResponse - информация о профиле пользователя
 type ProfileUserInfoResponse struct {
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
-	Bio       string `json:"bio"`
+	FirstName     string `json:"first_name"`
+	LastName      string `json:"last_name"`
+	Bio           string `json:"bio"`
+	UserAvatarUrl string `json:"user_avatar_url"`
 }
 
 type UpdateUserProfileInfoRequest struct {
@@ -82,4 +84,10 @@ type SubUserInfo struct {
 
 type SubsList struct {
 	Subs []SubUserInfo `json:"subs"`
+}
+
+type AvatarRequest struct {
+	Name   string `json:"name"`
+	Size   int64  `json:"size"`
+	Reader io.Reader
 }

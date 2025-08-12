@@ -45,7 +45,7 @@ func Run() {
 		log.Fatalf("can't initialize tables: %v", err)
 	}
 
-	usersService := usecase.New(repo, cfg)
+	usersService := usecase.New(repo, cfg, logger)
 
 	userHandler := handler.New(usersService, logger)
 
@@ -58,7 +58,7 @@ func Run() {
 		apiV1.POST("/update-user-info", userMiddleware, userHandler.UpdateProfile)
 		apiV1.POST("/user/subscribe/:username", userMiddleware, userHandler.Subscribe)
 		apiV1.POST("/user/unsubscribe/:username", userMiddleware, userHandler.UnsubscribeFromUser)
-
+		apiV1.POST("/user/upload-avatar", userMiddleware, userHandler.UploadAvatar)
 	}
 
 	internalApi := server.Group("/internal")

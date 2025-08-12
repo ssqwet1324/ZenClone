@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -21,16 +22,20 @@ type RepositoryProvider interface {
 	SubscribeFromUser(ctx context.Context, followerID, followingID uuid.UUID) error
 	GetSubsUser(ctx context.Context, userID uuid.UUID) (*entity.SubsList, error)
 	UnsubscribeFromUser(ctx context.Context, followerID, followingID uuid.UUID) error
+	UploadAvatar(ctx context.Context, userID uuid.UUID, bucketName string, avatarInfo entity.AvatarRequest) error
+	GetAvatarURL(ctx context.Context, bucketName string, userID uuid.UUID) (string, error)
 }
 type UserService struct {
 	repo RepositoryProvider
 	cfg  *config.Config
+	log  *zap.Logger
 }
 
-func New(repo RepositoryProvider, cfg *config.Config) *UserService {
+func New(repo RepositoryProvider, cfg *config.Config, log *zap.Logger) *UserService {
 	return &UserService{
 		repo: repo,
 		cfg:  cfg,
+		log:  log.Named("UserService"),
 	}
 }
 
@@ -89,7 +94,23 @@ func (s *UserService) UpdateRefreshToken(ctx context.Context, req entity.UpdateR
 
 // GetUserProfileByUsername - получить информацию по профилю пользователя
 func (s *UserService) GetUserProfileByUsername(ctx context.Context, username string) (*entity.ProfileUserInfoResponse, error) {
-	return s.repo.GetUserProfileByUsername(ctx, username)
+	userInfo, err := s.repo.GetUserProfileByUsername(ctx, username)
+	if err != nil {
+		return nil, fmt.Errorf("GetUserProfileByUsername: error getting user info: %w", err)
+	}
+
+	avatarURL, err := s.GetAvatarURL(ctx, s.cfg.BucketName, username)
+	if err != nil {
+		return nil, fmt.Errorf("GetUserProfileByUsername: error getting avatar url: %w", err)
+	}
+	fmt.Println("URL:", avatarURL)
+
+	return &entity.ProfileUserInfoResponse{
+		FirstName:     userInfo.FirstName,
+		LastName:      userInfo.LastName,
+		Bio:           userInfo.Bio,
+		UserAvatarUrl: avatarURL,
+	}, nil
 }
 
 func (s *UserService) GetUserIDByUsername(ctx context.Context, username string) (*entity.UserResponse, error) {
@@ -202,4 +223,27 @@ func (s *UserService) UnsubscribeFromUser(ctx context.Context, followerID uuid.U
 	}
 
 	return nil
+}
+
+func (s *UserService) UploadAvatar(ctx context.Context, userID uuid.UUID, avatarInfo entity.AvatarRequest) error {
+	err := s.repo.UploadAvatar(ctx, userID, s.cfg.BucketName, avatarInfo)
+	if err != nil {
+		return fmt.Errorf("UploadAvatar error: %w", err)
+	}
+
+	return nil
+}
+
+func (s *UserService) GetAvatarURL(ctx context.Context, bucketName string, username string) (string, error) {
+	userID, err := s.repo.GetUserIdByUsername(ctx, username)
+	if err != nil {
+		return "", fmt.Errorf("GetAvatarURL error: %w", err)
+	}
+
+	url, err := s.repo.GetAvatarURL(ctx, bucketName, userID.ID)
+	if err != nil {
+		return "", fmt.Errorf("GetAvatarURL error: %w", err)
+	}
+
+	return url, nil
 }

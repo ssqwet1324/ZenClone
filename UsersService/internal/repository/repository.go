@@ -9,12 +9,21 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 	"strconv"
 	"strings"
+	"time"
+)
+
+const (
+	minioEndpoint = "http://localhost:9000"
+	defaultAvatar = "defaultFoto/default.jpg"
 )
 
 type PostgresRepository struct {
-	DB *pgxpool.Pool
+	DB     *pgxpool.Pool
+	Client *minio.Client
 }
 
 func New(cfg *config.Config) (*PostgresRepository, error) {
@@ -32,8 +41,17 @@ func New(cfg *config.Config) (*PostgresRepository, error) {
 		return nil, fmt.Errorf("PostgresRepository: Error connecrtion from pgxpool: %v", err)
 	}
 
+	minioClient, err := minio.New(cfg.MinioEndpoint, &minio.Options{
+		Creds:  credentials.NewStaticV4(cfg.MinioAccessKey, cfg.MinioSecretKey, ""),
+		Secure: cfg.MinioUseSSl,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("PostgresRepository: error initializing MinIO client: %v", err)
+	}
+
 	return &PostgresRepository{
-		DB: dbPool,
+		DB:     dbPool,
+		Client: minioClient,
 	}, nil
 }
 
@@ -108,10 +126,11 @@ func (repo *PostgresRepository) UpdateRefreshToken(ctx context.Context, id uuid.
 func (repo *PostgresRepository) GetUserProfileByUsername(ctx context.Context, username string) (*entity.ProfileUserInfoResponse, error) {
 	var userInfoResponse entity.ProfileUserInfoResponse
 
-	err := repo.DB.QueryRow(ctx, `SELECT first_name, last_name, bio FROM Users WHERE username = $1`, username).
+	err := repo.DB.QueryRow(ctx, `SELECT first_name, last_name, bio, avatar_url FROM Users WHERE username = $1`, username).
 		Scan(&userInfoResponse.FirstName,
 			&userInfoResponse.LastName,
-			&userInfoResponse.Bio)
+			&userInfoResponse.Bio,
+			&userInfoResponse.UserAvatarUrl)
 
 	if err != nil {
 		return nil, fmt.Errorf("GetUserProfileByUsername: Error getting user information: %v", err)
@@ -240,4 +259,45 @@ func (repo *PostgresRepository) UnsubscribeFromUser(ctx context.Context, followe
 	}
 
 	return nil
+}
+
+// UploadAvatar - загружаем фото и сохраняем его имя в бд
+func (repo *PostgresRepository) UploadAvatar(ctx context.Context, userID uuid.UUID, bucketName string, avatarInfo entity.AvatarRequest) error {
+	// timestamp, чтобы ссылка менялась при каждой загрузке
+	objectName := fmt.Sprintf("%s/avatar_%d.jpg", userID.String(), time.Now().Unix())
+
+	_, err := repo.Client.PutObject(ctx, bucketName, objectName, avatarInfo.Reader, avatarInfo.Size, minio.PutObjectOptions{
+		ContentType: "image/jpg",
+	})
+	if err != nil {
+		return fmt.Errorf("UploadAvatar: error uploading avatar: %w", err)
+	}
+
+	// Сохраняем путь к аватару в БД
+	_, err = repo.DB.Exec(ctx, `UPDATE users SET avatar_url = $1 WHERE id = $2`, objectName, userID)
+	if err != nil {
+		return fmt.Errorf("UploadAvatar: error saving avatar_url in DB: %w", err)
+	}
+
+	return nil
+}
+
+// GetAvatarURL - получаем url аватарки по его имени
+func (repo *PostgresRepository) GetAvatarURL(ctx context.Context, bucketName string, userID uuid.UUID) (string, error) {
+	var objectName string
+	err := repo.DB.QueryRow(ctx, `SELECT avatar_url FROM users WHERE id = $1`, userID).Scan(&objectName)
+	if err != nil {
+		return "", fmt.Errorf("GetAvatarURL: error fetching avatar_url from DB: %w", err)
+	}
+
+	if objectName == "default" {
+		// Возвращаем дефолтную аватарку
+		avatarURL := fmt.Sprintf(minioEndpoint+"/%s/%s", bucketName, defaultAvatar)
+
+		return avatarURL, nil
+	}
+
+	avatarURL := fmt.Sprintf("%s/%s/%s", minioEndpoint, bucketName, objectName)
+
+	return avatarURL, nil
 }
