@@ -209,7 +209,6 @@ func (s *Service) LoginAccount(ctx context.Context, login, password string) (str
 
 // RefreshTokens - Отдаем новые токены
 func (s *Service) RefreshTokens(ctx context.Context, refreshToken, authHeader string) (string, string, error) {
-	// Checking the Authorization Header Format
 	parts := strings.Split(authHeader, " ")
 	if len(parts) != 2 || parts[0] != "Bearer" {
 		return "", "", fmt.Errorf("RefreshTokens: invalid authorization header")

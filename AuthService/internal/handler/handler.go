@@ -46,7 +46,7 @@ func (handler *AuthHandler) Register(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{
-		"user_id":       userID,
+		"id":            userID,
 		"refresh_token": refreshToken,
 		"access_token":  accessToken,
 	})
@@ -94,7 +94,7 @@ func (handler *AuthHandler) Login(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{
-		"user_id":       userID,
+		"id":            userID,
 		"refresh_token": refreshToken,
 		"access_token":  accessToken,
 	})
