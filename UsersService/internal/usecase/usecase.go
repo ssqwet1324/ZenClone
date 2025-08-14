@@ -103,7 +103,6 @@ func (s *UserService) GetUserProfileByUsername(ctx context.Context, username str
 	if err != nil {
 		return nil, fmt.Errorf("GetUserProfileByUsername: error getting avatar url: %w", err)
 	}
-	fmt.Println("URL:", avatarURL)
 
 	return &entity.ProfileUserInfoResponse{
 		FirstName:     userInfo.FirstName,
@@ -126,6 +125,9 @@ func (s *UserService) GetUserIDByUsername(ctx context.Context, username string) 
 
 func (s *UserService) UpdateUserProfile(ctx context.Context, id uuid.UUID, updateProfileInfo entity.UpdateUserProfileInfoRequest) (*entity.UpdateUserProfileInfoResponse, error) {
 	login, err := s.repo.GetLoginByUserID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("UpdateUserProfile error getting login by user id: %w", err)
+	}
 
 	// тут сверяем пароли
 	if updateProfileInfo.PasswordNew != nil && updateProfileInfo.PasswordOld != nil {
@@ -176,12 +178,10 @@ func (s *UserService) UpdateUserProfile(ctx context.Context, id uuid.UUID, updat
 
 // SubscribeToUser - подписаться на пользователя
 func (s *UserService) SubscribeToUser(ctx context.Context, followerID uuid.UUID, username string) error {
-	fmt.Println(followerID, username)
 	followingID, err := s.repo.GetUserIdByUsername(ctx, username)
 	if err != nil {
 		return fmt.Errorf("GetUserIdByUsername error: %w", err)
 	}
-	fmt.Println(followerID, followingID)
 
 	err = s.repo.SubscribeFromUser(ctx, followerID, followingID.ID)
 	if err != nil {

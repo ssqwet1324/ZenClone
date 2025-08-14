@@ -6,24 +6,25 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
-	"strconv"
-	"strings"
-	"time"
 )
 
 const (
-	minioEndpoint = "http://localhost:9000"
 	defaultAvatar = "defaultFoto/default.jpg"
 )
 
 type PostgresRepository struct {
 	DB     *pgxpool.Pool
 	Client *minio.Client
+	Config *config.Config
 }
 
 func New(cfg *config.Config) (*PostgresRepository, error) {
@@ -52,6 +53,7 @@ func New(cfg *config.Config) (*PostgresRepository, error) {
 	return &PostgresRepository{
 		DB:     dbPool,
 		Client: minioClient,
+		Config: cfg,
 	}, nil
 }
 
@@ -290,14 +292,17 @@ func (repo *PostgresRepository) GetAvatarURL(ctx context.Context, bucketName str
 		return "", fmt.Errorf("GetAvatarURL: error fetching avatar_url from DB: %w", err)
 	}
 
+	publicEndpoint := repo.Config.MinIoPublicEndpoint
+	if publicEndpoint == "" {
+		publicEndpoint = repo.Config.MinioEndpoint
+	}
+
 	if objectName == "default" {
 		// Возвращаем дефолтную аватарку
-		avatarURL := fmt.Sprintf(minioEndpoint+"/%s/%s", bucketName, defaultAvatar)
-
+		avatarURL := fmt.Sprintf("%s/%s/%s", publicEndpoint, bucketName, defaultAvatar)
 		return avatarURL, nil
 	}
 
-	avatarURL := fmt.Sprintf("%s/%s/%s", minioEndpoint, bucketName, objectName)
-
+	avatarURL := fmt.Sprintf("%s/%s/%s", publicEndpoint, bucketName, objectName)
 	return avatarURL, nil
 }

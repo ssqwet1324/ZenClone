@@ -336,6 +336,7 @@ func (h *UsersHandler) UploadAvatar(ctx *gin.Context) {
 		return
 	}
 
+	//вписываем структуру данные аватарки
 	avatarReq := entity.AvatarRequest{
 		Name:   file.Filename,
 		Size:   file.Size,
