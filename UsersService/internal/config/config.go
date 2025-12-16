@@ -2,11 +2,11 @@ package config
 
 import (
 	"fmt"
-	"github.com/joho/godotenv"
-	"os"
-	"strconv"
+
+	"github.com/ilyakaznacheev/cleanenv"
 )
 
+// Config - структура кфг
 type Config struct {
 	JWTSecret           string `env:"JWT_SECRET"`
 	DbName              string `env:"DB_NAME"`
@@ -22,36 +22,14 @@ type Config struct {
 	BucketName          string `env:"BUCKET_NAME"`
 }
 
+// New - конструктор кфг
 func New() (*Config, error) {
-	err := godotenv.Load()
+	var cfg Config
+
+	err := cleanenv.ReadEnv(&cfg)
 	if err != nil {
-		return nil, fmt.Errorf("config UserService: error loading .env file")
+		return nil, fmt.Errorf("failed to read config: %w", err)
 	}
 
-	var conf Config
-
-	conf.JWTSecret = os.Getenv("JWT_SECRET")
-	conf.DbName = os.Getenv("DB_NAME")
-	conf.DbUser = os.Getenv("DB_USER")
-	conf.DbPassword = os.Getenv("DB_PASSWORD")
-	conf.DbHost = os.Getenv("DB_HOST")
-
-	conf.DbPort, err = strconv.Atoi(os.Getenv("DB_PORT"))
-	if err != nil {
-		return nil, fmt.Errorf("config UserService: error converting DB_PORT to int: %w", err)
-	}
-
-	conf.MinioEndpoint = os.Getenv("MINIO_ENDPOINT")
-	conf.MinioAccessKey = os.Getenv("MINIO_ACCESS_KEY")
-	conf.MinioSecretKey = os.Getenv("MINIO_SECRET_KEY")
-	conf.BucketName = os.Getenv("BUCKET_NAME")
-	conf.MinIoPublicEndpoint = os.Getenv("MINIO_PUBLIC_ENDPOINT")
-
-	useSSLStr := os.Getenv("MINIO_USE_SSL")
-	conf.MinioUseSSl, err = strconv.ParseBool(useSSLStr)
-	if err != nil {
-		conf.MinioUseSSl = false
-	}
-
-	return &conf, nil
+	return &cfg, nil
 }

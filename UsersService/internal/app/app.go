@@ -8,9 +8,10 @@ import (
 	"UsersService/internal/repository"
 	"UsersService/internal/usecase"
 	"context"
+	"log"
+
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
-	"log"
 )
 
 func Run() {
@@ -18,12 +19,12 @@ func Run() {
 
 	logger, err := zap.NewDevelopment()
 	if err != nil {
-		log.Fatalf("can't initialize zap logger: %v", err)
+		panic("Error creating zap logger: " + err.Error())
 	}
 
 	cfg, err := config.New()
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal("can't initialize config", zap.Error(err))
 	}
 
 	userMiddleware := middleware.JWTAuthMiddleware(cfg)
@@ -33,7 +34,7 @@ func Run() {
 
 	repo, err := repository.New(cfg)
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal("can't initialize repository", zap.Error(err))
 	}
 
 	migration := migrations.New(repo, logger)
@@ -42,7 +43,7 @@ func Run() {
 
 	err = migration.InitTables(ctx)
 	if err != nil {
-		log.Fatalf("can't initialize tables: %v", err)
+		logger.Fatal("can't initialize migration", zap.Error(err))
 	}
 
 	usersService := usecase.New(repo, cfg, logger)
@@ -70,6 +71,6 @@ func Run() {
 	}
 
 	if err := server.Run(":8081"); err != nil {
-		log.Fatal(err)
+		logger.Fatal("failed to run server", zap.Error(err))
 	}
 }

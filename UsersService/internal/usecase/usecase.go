@@ -5,6 +5,7 @@ import (
 	"UsersService/internal/entity"
 	"context"
 	"fmt"
+
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
@@ -48,7 +49,7 @@ func (s *UserService) AddUser(ctx context.Context, addUserInfo entity.AddUserReq
 	return nil
 }
 
-// CompareAuthData - тут надо сравнить hash пароля
+// CompareAuthData - сравнение hash пароля
 func (s *UserService) CompareAuthData(ctx context.Context, users entity.AuthRequest) (*entity.CompareDataResponse, error) {
 	var compareData entity.CompareDataResponse
 
