@@ -11,12 +11,14 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// Config - конфиг
 type Config struct {
-	JWTSecret    string `json:"JWT_SECRET"`
+	JWTSecret    string
 	RedisConfig  *redis.Config
 	ClientConfig *UsersClient.ConfigUsersServiceClient
 }
 
+// New - конструктор
 func New() (*Config, error) {
 	err := godotenv.Load()
 	if err != nil {
@@ -33,15 +35,17 @@ func New() (*Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error parsing REDIS_DB: %w", err)
 	}
+
 	conf.RedisConfig.RedisPWD = os.Getenv("REDIS_PWD")
 	conf.ClientConfig.BaseURL = os.Getenv("BASE_URL")
 	conf.ClientConfig.RetryDelay, err = time.ParseDuration(os.Getenv("BASE_RETRY_DELAY"))
 	if err != nil {
-		return nil, fmt.Errorf("Config: error parsing BASE_RETRY_DELAY: %w", err)
+		return nil, fmt.Errorf("config: error parsing BASE_RETRY_DELAY: %w", err)
 	}
+
 	conf.ClientConfig.RetryCount, err = strconv.ParseInt(os.Getenv("BASE_RETRY_COUNT"), 10, 64)
 	if err != nil {
-		return nil, fmt.Errorf("Config: error parsing BASE_RETRY_COUNT: %w", err)
+		return nil, fmt.Errorf("config: error parsing BASE_RETRY_COUNT: %w", err)
 	}
 
 	return &conf, nil

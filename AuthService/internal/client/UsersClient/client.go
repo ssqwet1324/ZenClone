@@ -23,12 +23,14 @@ type ClientProvider interface {
 	UpdateRefreshToken(ctx context.Context, req UpdateRefreshTokenRequest) error
 }
 
+// clientService - структура клиента
 type clientService struct {
 	client  *resty.Client
 	baseUrl string
 	log     *zap.Logger
 }
 
+// New - конструктор
 func New(client *resty.Client, log *zap.Logger, cfg *ConfigUsersServiceClient) ClientProvider {
 	client.
 		SetRetryCount(int(cfg.RetryCount)).
@@ -41,6 +43,7 @@ func New(client *resty.Client, log *zap.Logger, cfg *ConfigUsersServiceClient) C
 	}
 }
 
+// AddUser - добавление пользователя
 func (c *clientService) AddUser(ctx context.Context, userData RegisterRequest) error {
 	response, err := c.client.R().
 		SetContext(ctx).
@@ -58,6 +61,7 @@ func (c *clientService) AddUser(ctx context.Context, userData RegisterRequest) e
 	return nil
 }
 
+// CompareAuthData - сравнение данных для входа
 func (c *clientService) CompareAuthData(ctx context.Context, userData AuthRequest) (string, error) {
 	var authResponse AuthResponse
 	response, err := c.client.R().
@@ -80,6 +84,7 @@ func (c *clientService) CompareAuthData(ctx context.Context, userData AuthReques
 	return authResponse.ID, nil
 }
 
+// GetRefreshToken  - получаем refresh токен
 func (c *clientService) GetRefreshToken(ctx context.Context, token TokenRequest) (string, error) {
 	var tokenResponse TokenResponse
 	response, err := c.client.R().SetContext(ctx).SetBody(token).Post(c.baseUrl + getRefreshToken)
@@ -98,6 +103,7 @@ func (c *clientService) GetRefreshToken(ctx context.Context, token TokenRequest)
 	return tokenResponse.RefreshToken, nil
 }
 
+// UpdateRefreshToken - обновляем токен
 func (c *clientService) UpdateRefreshToken(ctx context.Context, req UpdateRefreshTokenRequest) error {
 	response, err := c.client.R().SetContext(ctx).SetBody(req).Post(c.baseUrl + updateRefreshToken)
 	if err != nil {

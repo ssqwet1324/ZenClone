@@ -5,11 +5,11 @@ import (
 	"AuthService/internal/config"
 	"AuthService/internal/handler"
 	"AuthService/internal/repository/redis"
-	"AuthService/internal/service"
+	"AuthService/internal/usecase"
+
 	"github.com/gin-gonic/gin"
 	"github.com/go-resty/resty/v2"
 	"go.uber.org/zap"
-	"log"
 )
 
 func Run() {
@@ -17,12 +17,12 @@ func Run() {
 
 	logger, err := zap.NewDevelopment()
 	if err != nil {
-		log.Fatal(err)
+		panic("Error initializing logger")
 	}
 
 	cfg, err := config.New()
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal("Error initializing config", zap.Error(err))
 	}
 
 	restyClient := resty.New()
@@ -31,9 +31,9 @@ func Run() {
 
 	client := UsersClient.New(restyClient, logger, cfg.ClientConfig)
 
-	authService := service.New(repo, logger, client, cfg)
+	uc := usecase.New(repo, logger, client, cfg)
 
-	authHandler := handler.New(authService, logger, cfg, client)
+	authHandler := handler.New(uc, logger, cfg, client)
 
 	apiV1 := server.Group("/api/v1/auth")
 	{
@@ -43,6 +43,6 @@ func Run() {
 	}
 
 	if err := server.Run(":8080"); err != nil {
-		log.Fatal(err)
+		logger.Fatal("Error starting usecase", zap.Error(err))
 	}
 }
