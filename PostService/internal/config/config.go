@@ -2,9 +2,8 @@ package config
 
 import (
 	"fmt"
-	"github.com/joho/godotenv"
-	"os"
-	"strconv"
+
+	"github.com/ilyakaznacheev/cleanenv"
 )
 
 type Config struct {
@@ -17,22 +16,12 @@ type Config struct {
 }
 
 func New() (*Config, error) {
-	err := godotenv.Load()
+	var cfg Config
+
+	err := cleanenv.ReadEnv(&cfg)
 	if err != nil {
-		return nil, fmt.Errorf("config UserService: Error loading .env file")
+		return nil, fmt.Errorf("can't initialize config: %w", err)
 	}
 
-	var conf Config
-
-	conf.JWTSecret = os.Getenv("JWT_SECRET")
-	conf.DbName = os.Getenv("DB_NAME")
-	conf.DbUser = os.Getenv("DB_USER")
-	conf.DbPassword = os.Getenv("DB_PASSWORD")
-	conf.DbHost = os.Getenv("DB_HOST")
-	conf.DbPort, err = strconv.Atoi(os.Getenv("DB_PORT"))
-	if err != nil {
-		return nil, fmt.Errorf("config UserService: Error converting DB_PORT to int")
-	}
-
-	return &conf, nil
+	return &cfg, nil
 }

@@ -9,9 +9,10 @@ import (
 	"PostService/internal/repository"
 	"PostService/internal/usecase"
 	"context"
+	"log"
+
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
-	"log"
 )
 
 func Run() {
@@ -19,19 +20,19 @@ func Run() {
 
 	logger, err := zap.NewDevelopment()
 	if err != nil {
-		log.Fatalf("can't initialize zap logger: %v", err)
+		panic("Error creating zap logger: " + err.Error())
 	}
 
 	cfg, err := config.New()
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal("can't initialize config", zap.Error(err))
 	}
 
 	userMiddleware := middleware.JWTAuthMiddleware(cfg)
 
 	repo, err := repository.New(cfg, logger)
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal("can't initialize repository", zap.Error(err))
 	}
 
 	producer := kafka.New([]string{"kafka:9092"}, "posts")
@@ -42,7 +43,7 @@ func Run() {
 
 	err = migration.InitTables(ctx)
 	if err != nil {
-		log.Fatalf("can't initialize tables: %v", err)
+		logger.Fatal("init tables failed", zap.Error(err))
 	}
 
 	postService := usecase.New(repo, cfg, producer)
