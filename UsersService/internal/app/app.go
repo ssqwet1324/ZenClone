@@ -8,7 +8,6 @@ import (
 	"UsersService/internal/repository"
 	"UsersService/internal/usecase"
 	"context"
-	"log"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -28,9 +27,6 @@ func Run() {
 	}
 
 	userMiddleware := middleware.JWTAuthMiddleware(cfg)
-	if userMiddleware == nil {
-		log.Fatal("JWT middleware initialization failed")
-	}
 
 	repo, err := repository.New(cfg)
 	if err != nil {
