@@ -4,61 +4,91 @@ import (
 	"UsersService/internal/config"
 	"UsersService/internal/entity"
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	"go.uber.org/zap"
 )
 
 const (
 	defaultAvatar = "defaultFoto/default.jpg"
 )
 
+// PostgresRepository - структура хранилищ
 type PostgresRepository struct {
-	DB     *pgxpool.Pool
-	Client *minio.Client
-	Config *config.Config
+	db     *pgx.Conn
+	client *minio.Client
+	config *config.Config
+	logger *zap.Logger
 }
 
-func New(cfg *config.Config) (*PostgresRepository, error) {
-	dsn := fmt.Sprintf(
-		"postgres://%s:%s@%s:%s/%s?sslmode=disable",
-		cfg.DbUser,
-		cfg.DbPassword,
-		cfg.DbHost,
-		strconv.Itoa(cfg.DbPort),
-		cfg.DbName,
+// Init - инициализация repository
+func Init(ctx context.Context, cfg *config.Config, log *zap.Logger) (*PostgresRepository, error) {
+	conn, err := pgx.Connect(ctx, cfg.CreateDsn())
+	if err != nil {
+		return nil, fmt.Errorf("PostgresRepository: Error connecting to PostService: %v", err)
+	}
+
+	sqlDb := stdlib.OpenDB(*conn.Config())
+	defer func(sqlDb *sql.DB) {
+		err := sqlDb.Close()
+		if err != nil {
+			log.Warn("PostgresRepository: Error closing PostService", zap.Error(err))
+		}
+	}(sqlDb)
+
+	driver, err := postgres.WithInstance(sqlDb, &postgres.Config{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create migrate driver: %w", err)
+	}
+
+	m, err := migrate.NewWithDatabaseInstance(
+		"file://migrations",
+		"pgx", driver,
 	)
 
-	dbPool, err := pgxpool.New(context.Background(), dsn)
 	if err != nil {
-		return nil, fmt.Errorf("PostgresRepository: Error connecrtion from pgxpool: %v", err)
+		return nil, fmt.Errorf("failed to create migrate: %w", err)
 	}
+
+	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		return nil, fmt.Errorf("failed to run migrations: %w", err)
+	}
+
+	log.Info("Migration initialized successfully")
 
 	minioClient, err := minio.New(cfg.MinioEndpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(cfg.MinioAccessKey, cfg.MinioSecretKey, ""),
 		Secure: cfg.MinioUseSSl,
 	})
+
 	if err != nil {
 		return nil, fmt.Errorf("PostgresRepository: error initializing MinIO client: %v", err)
 	}
 
+	log.Info("Successfully initialized MinIO client")
+
 	return &PostgresRepository{
-		DB:     dbPool,
-		Client: minioClient,
-		Config: cfg,
+		db:     conn,
+		client: minioClient,
+		config: cfg,
+		logger: log.Named("Repository"),
 	}, nil
 }
 
 // AddUser - добавить пользователя в Бд
 func (repo *PostgresRepository) AddUser(ctx context.Context, addUserInfo entity.AddUserRequest) error {
-	_, err := repo.DB.Exec(ctx, `INSERT INTO Users (id, login, password, username, first_name, last_name, bio) 
+	_, err := repo.db.Exec(ctx, `INSERT INTO Users (id, login, password, username, first_name, last_name, bio) 
 		VALUES ($1, $2, $3, $4, $5, $6, $7)`,
 		addUserInfo.ID,
 		addUserInfo.Login,
@@ -69,7 +99,7 @@ func (repo *PostgresRepository) AddUser(ctx context.Context, addUserInfo entity.
 		addUserInfo.Bio,
 	)
 	if err != nil {
-		return fmt.Errorf("AddUser: Error adding user in DB: %v", err)
+		return fmt.Errorf("AddUser: Error adding user in db: %v", err)
 	}
 
 	return nil
@@ -78,7 +108,7 @@ func (repo *PostgresRepository) AddUser(ctx context.Context, addUserInfo entity.
 // GetLoginByUserID - получаем логин по id пользователя
 func (repo *PostgresRepository) GetLoginByUserID(ctx context.Context, id uuid.UUID) (string, error) {
 	var login string
-	err := repo.DB.QueryRow(ctx, `SELECT login FROM Users WHERE id = $1`, id).Scan(&login)
+	err := repo.db.QueryRow(ctx, `SELECT login FROM Users WHERE id = $1`, id).Scan(&login)
 	if err != nil {
 		return "", fmt.Errorf("GetLoginByUserID: Error getting login by user: %v", err)
 	}
@@ -90,7 +120,7 @@ func (repo *PostgresRepository) GetLoginByUserID(ctx context.Context, id uuid.UU
 func (repo *PostgresRepository) GetUserInfoByLogin(ctx context.Context, login string) (*entity.LoginResponse, error) {
 	var userInfo entity.LoginResponse
 
-	err := repo.DB.QueryRow(ctx, `SELECT id, password FROM Users WHERE login = $1`, login).Scan(&userInfo.ID, &userInfo.Password)
+	err := repo.db.QueryRow(ctx, `SELECT id, password FROM Users WHERE login = $1`, login).Scan(&userInfo.ID, &userInfo.Password)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, fmt.Errorf("GetUserInfo: User not found")
 	}
@@ -106,7 +136,7 @@ func (repo *PostgresRepository) GetUserInfoByLogin(ctx context.Context, login st
 func (repo *PostgresRepository) GetRefreshTokenByUserID(ctx context.Context, id uuid.UUID) (*entity.RefreshTokenResponse, error) {
 	var refreshInfo entity.RefreshTokenResponse
 
-	err := repo.DB.QueryRow(ctx, `SELECT refresh_token FROM Users WHERE id = $1`, id).Scan(&refreshInfo.RefreshToken)
+	err := repo.db.QueryRow(ctx, `SELECT refresh_token FROM Users WHERE id = $1`, id).Scan(&refreshInfo.RefreshToken)
 	if err != nil {
 		return nil, fmt.Errorf("GetRefreshTokenByUserID: Error getting user information: %v", err)
 	}
@@ -116,7 +146,7 @@ func (repo *PostgresRepository) GetRefreshTokenByUserID(ctx context.Context, id 
 
 // UpdateRefreshToken - обновляем refresh токен в БД
 func (repo *PostgresRepository) UpdateRefreshToken(ctx context.Context, id uuid.UUID, refreshToken string) error {
-	_, err := repo.DB.Exec(ctx, `UPDATE Users SET refresh_token = $1 WHERE id = $2`, refreshToken, id)
+	_, err := repo.db.Exec(ctx, `UPDATE Users SET refresh_token = $1 WHERE id = $2`, refreshToken, id)
 	if err != nil {
 		return fmt.Errorf("UpdateRefreshToken: error update refresh token %w", err)
 	}
@@ -128,7 +158,7 @@ func (repo *PostgresRepository) UpdateRefreshToken(ctx context.Context, id uuid.
 func (repo *PostgresRepository) GetUserProfileByUsername(ctx context.Context, username string) (*entity.ProfileUserInfoResponse, error) {
 	var userInfoResponse entity.ProfileUserInfoResponse
 
-	err := repo.DB.QueryRow(ctx, `SELECT first_name, last_name, bio, avatar_url FROM Users WHERE username = $1`,
+	err := repo.db.QueryRow(ctx, `SELECT first_name, last_name, bio, avatar_url FROM Users WHERE username = $1`,
 		username).Scan(&userInfoResponse.FirstName,
 		&userInfoResponse.LastName,
 		&userInfoResponse.Bio,
@@ -182,7 +212,7 @@ func (repo *PostgresRepository) UpdateUserProfile(ctx context.Context, id uuid.U
 
 	query := fmt.Sprintf("UPDATE Users SET %s WHERE id = $%d", strings.Join(setParts, ", "), argIdx)
 
-	_, err := repo.DB.Exec(ctx, query, args...)
+	_, err := repo.db.Exec(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("UpdateUserProfile: error updating data %w", err)
 	}
@@ -193,7 +223,7 @@ func (repo *PostgresRepository) UpdateUserProfile(ctx context.Context, id uuid.U
 // GetUserIdByUsername - получить ID по username
 func (repo *PostgresRepository) GetUserIdByUsername(ctx context.Context, username string) (*entity.UserResponse, error) {
 	var userIDResponse entity.UserResponse
-	err := repo.DB.QueryRow(ctx, `SELECT id FROM users WHERE username = $1`, username).Scan(&userIDResponse.ID)
+	err := repo.db.QueryRow(ctx, `SELECT id FROM users WHERE username = $1`, username).Scan(&userIDResponse.ID)
 	if err != nil {
 		return nil, fmt.Errorf("GetUserIdByUsername: Error getting user information: %v", err)
 	}
@@ -207,7 +237,7 @@ func (repo *PostgresRepository) GetUserIdByUsername(ctx context.Context, usernam
 
 // SubscribeFromUser - подписаться на пользователя
 func (repo *PostgresRepository) SubscribeFromUser(ctx context.Context, followerID, followingID uuid.UUID) error {
-	rows, err := repo.DB.Exec(ctx, `INSERT INTO subscriptions (follower_id, following_id) VALUES ($1, $2)`,
+	rows, err := repo.db.Exec(ctx, `INSERT INTO subscriptions (follower_id, following_id) VALUES ($1, $2)`,
 		followerID, followingID)
 	if err != nil {
 		return fmt.Errorf("CreateSubToUser: error inserting subscription: %w", err)
@@ -224,7 +254,7 @@ func (repo *PostgresRepository) SubscribeFromUser(ctx context.Context, followerI
 func (repo *PostgresRepository) GetSubsUser(ctx context.Context, userID uuid.UUID) (*entity.SubsList, error) {
 	var subList entity.SubsList
 
-	rows, err := repo.DB.Query(ctx, `
+	rows, err := repo.db.Query(ctx, `
 		SELECT users.id, users.username, users.first_name, users.last_name
 		FROM subscriptions
 		JOIN users ON subscriptions.following_id = users.id
@@ -252,7 +282,7 @@ func (repo *PostgresRepository) GetSubsUser(ctx context.Context, userID uuid.UUI
 
 // UnsubscribeFromUser - отписаться от пользователя
 func (repo *PostgresRepository) UnsubscribeFromUser(ctx context.Context, followerID, followingID uuid.UUID) error {
-	row, err := repo.DB.Exec(ctx, `DELETE FROM subscriptions WHERE follower_id = $1 AND following_id = $2`, followerID, followingID)
+	row, err := repo.db.Exec(ctx, `DELETE FROM subscriptions WHERE follower_id = $1 AND following_id = $2`, followerID, followingID)
 	if err != nil {
 		return fmt.Errorf("DeleteSub: error executing delete: %w", err)
 	}

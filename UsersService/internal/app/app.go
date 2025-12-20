@@ -4,7 +4,6 @@ import (
 	"UsersService/internal/config"
 	"UsersService/internal/handler"
 	"UsersService/internal/middleware"
-	"UsersService/internal/migrations"
 	"UsersService/internal/repository"
 	"UsersService/internal/usecase"
 	"context"
@@ -28,18 +27,9 @@ func Run() {
 
 	userMiddleware := middleware.JWTAuthMiddleware(cfg)
 
-	repo, err := repository.New(cfg)
+	repo, err := repository.Init(context.Background(), cfg, logger)
 	if err != nil {
 		logger.Fatal("can't initialize repository", zap.Error(err))
-	}
-
-	migration := migrations.New(repo, logger)
-
-	ctx := context.Background()
-
-	err = migration.InitTables(ctx)
-	if err != nil {
-		logger.Fatal("can't initialize migration", zap.Error(err))
 	}
 
 	usersService := usecase.New(repo, cfg, logger)

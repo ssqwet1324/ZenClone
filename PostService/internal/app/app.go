@@ -5,10 +5,10 @@ import (
 	"PostService/internal/handler"
 	"PostService/internal/kafka"
 	"PostService/internal/middleware"
-	"PostService/internal/migrations"
 	"PostService/internal/repository"
 	"PostService/internal/usecase"
 	"context"
+	"fmt"
 	"log"
 
 	"github.com/gin-gonic/gin"
@@ -27,24 +27,16 @@ func Run() {
 	if err != nil {
 		logger.Fatal("can't initialize config", zap.Error(err))
 	}
+	fmt.Println(cfg.CreateDsn())
 
 	userMiddleware := middleware.JWTAuthMiddleware(cfg)
 
-	repo, err := repository.New(cfg, logger)
+	repo, err := repository.Init(context.Background(), cfg, logger)
 	if err != nil {
-		logger.Fatal("can't initialize repository", zap.Error(err))
+		logger.Fatal("failed to init postgres repo", zap.Error(err))
 	}
 
-	producer := kafka.New([]string{"kafka:9092"}, "posts")
-
-	migration := migrations.New(repo, logger)
-
-	ctx := context.Background()
-
-	err = migration.InitTables(ctx)
-	if err != nil {
-		logger.Fatal("init tables failed", zap.Error(err))
-	}
+	producer := kafka.New([]string{cfg.KafkaAddr}, cfg.KafkaTopic)
 
 	postService := usecase.New(repo, cfg, producer)
 

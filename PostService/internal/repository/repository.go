@@ -4,51 +4,83 @@ import (
 	"PostService/internal/config"
 	"PostService/internal/entity"
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/stdlib"
 	"go.uber.org/zap"
 )
 
 type PostgresRepository struct {
-	DB  *pgxpool.Pool
+	db  *pgx.Conn
 	log *zap.Logger
 	cfg *config.Config
 }
 
-func New(cfg *config.Config, log *zap.Logger) (*PostgresRepository, error) {
-	dsn := fmt.Sprintf(
-		"postgres://%s:%s@%s:%s/%s?sslmode=disable",
-		cfg.DbUser,
-		cfg.DbPassword,
-		cfg.DbHost,
-		strconv.Itoa(cfg.DbPort),
-		cfg.DbName,
-	)
-
-	dbPool, err := pgxpool.New(context.Background(), dsn)
+// Init - инициализация repository
+func Init(ctx context.Context, cfg *config.Config, log *zap.Logger) (*PostgresRepository, error) {
+	conn, err := pgx.Connect(ctx, cfg.CreateDsn())
 	if err != nil {
-		return nil, fmt.Errorf("PostgresRepository: Error connecrtion from pgxpool: %v", err)
+		return nil, fmt.Errorf("PostgresRepository: Error connecting to PostService: %v", err)
 	}
 
+	sqlDb := stdlib.OpenDB(*conn.Config())
+	defer func(sqlDb *sql.DB) {
+		err := sqlDb.Close()
+		if err != nil {
+			log.Warn("PostgresRepository: Error closing PostService", zap.Error(err))
+		}
+	}(sqlDb)
+
+	driver, err := postgres.WithInstance(sqlDb, &postgres.Config{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create migrate driver: %w", err)
+	}
+
+	m, err := migrate.NewWithDatabaseInstance(
+		"file://migrations",
+		"pgx", driver,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create migrate: %w", err)
+	}
+
+	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		return nil, fmt.Errorf("failed to run migrations: %w", err)
+	}
+
+	log.Info("Migration initialized successfully")
+
 	return &PostgresRepository{
-		DB:  dbPool,
-		log: log.Named("PostRepository"),
+		db:  conn,
+		log: log.Named("Repository"),
 		cfg: cfg,
 	}, nil
+}
+
+// Close - закрытие бд
+func (repo *PostgresRepository) Close(ctx context.Context) {
+	if err := repo.db.Close(ctx); err != nil {
+		repo.log.Warn("PostgresRepository: Error closing PostService", zap.Error(err))
+	}
+
+	repo.log.Info("db closed")
 }
 
 // CreatePost - создать пост
 func (repo *PostgresRepository) CreatePost(ctx context.Context, createPost entity.CreatePostResponse) (*entity.CreatePostResponse, error) {
 	var postResponse entity.CreatePostResponse
 
-	err := repo.DB.QueryRow(ctx,
+	err := repo.db.QueryRow(ctx,
 		`INSERT INTO Posts (post_id, title, content, author_id)
 		 VALUES ($1, $2, $3, $4)
 		 RETURNING post_id, title, content, author_id, created_at`,
@@ -110,7 +142,7 @@ func (repo *PostgresRepository) UpdatePost(ctx context.Context, postID uuid.UUID
 		authorIDArgIdx,
 	)
 
-	err := repo.DB.QueryRow(ctx, query, args...).Scan(&postResponse.Title, &postResponse.Content, &postResponse.UpdatedAt)
+	err := repo.db.QueryRow(ctx, query, args...).Scan(&postResponse.Title, &postResponse.Content, &postResponse.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return &postResponse, fmt.Errorf("UpdatePost: post not found or not author")
@@ -126,7 +158,7 @@ func (repo *PostgresRepository) UpdatePost(ctx context.Context, postID uuid.UUID
 
 // DeletePost - удалить пост
 func (repo *PostgresRepository) DeletePost(ctx context.Context, postID uuid.UUID, userID uuid.UUID) error {
-	res, err := repo.DB.Exec(ctx, `DELETE FROM Posts WHERE post_id = $1 AND author_id = $2`, postID, userID)
+	res, err := repo.db.Exec(ctx, `DELETE FROM Posts WHERE post_id = $1 AND author_id = $2`, postID, userID)
 	if err != nil {
 		return fmt.Errorf("DeletePost: error deleting post: %v", err)
 	}
@@ -144,7 +176,7 @@ func (repo *PostgresRepository) DeletePost(ctx context.Context, postID uuid.UUID
 func (repo *PostgresRepository) GetPostsUser(ctx context.Context, authorID uuid.UUID) (*entity.PostListResponse, error) {
 	var postList entity.PostListResponse
 
-	rows, err := repo.DB.Query(ctx, `SELECT post_id, title, content, created_at, updated_at FROM Posts WHERE author_id = $1`, authorID)
+	rows, err := repo.db.Query(ctx, `SELECT post_id, title, content, created_at, updated_at FROM Posts WHERE author_id = $1`, authorID)
 	if err != nil {
 		return nil, fmt.Errorf("GetPostsUser: error getting posts: %v", err)
 	}

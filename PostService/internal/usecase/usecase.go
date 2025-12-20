@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// RepositoryProvider - функции из repository
 type RepositoryProvider interface {
 	CreatePost(ctx context.Context, createPost entity.CreatePostResponse) (*entity.CreatePostResponse, error)
 	UpdatePost(ctx context.Context, postID uuid.UUID, authorID uuid.UUID, updateReq entity.UpdateUserPostRequest) (*entity.UpdateUserPostResponse, error)
@@ -18,12 +19,14 @@ type RepositoryProvider interface {
 	GetPostsUser(ctx context.Context, authorID uuid.UUID) (*entity.PostListResponse, error)
 }
 
+// PostUseCase - структура бизнес логики
 type PostUseCase struct {
 	producer *kafka.Producer
 	repo     RepositoryProvider
 	cfg      *config.Config
 }
 
+// New - конструктор бизнес логики
 func New(repo RepositoryProvider, cfg *config.Config, producer *kafka.Producer) *PostUseCase {
 	return &PostUseCase{
 		producer: producer,

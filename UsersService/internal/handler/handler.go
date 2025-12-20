@@ -110,6 +110,7 @@ func (h *UsersHandler) GetProfile(ctx *gin.Context) {
 }
 
 func (h *UsersHandler) UpdateProfile(ctx *gin.Context) {
+	// берем userID из jwt токена
 	userIDRaw, exists := ctx.Get("userID")
 	if !exists {
 		h.log.Warn("UpdateProfile: userID not found in context")

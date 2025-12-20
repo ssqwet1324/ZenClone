@@ -15,7 +15,7 @@ func (repo *PostgresRepository) UploadAvatar(ctx context.Context, userID uuid.UU
 	// timestamp, чтобы ссылка менялась при каждой загрузке
 	objectName := fmt.Sprintf("%s/avatar_%d.jpg", userID.String(), time.Now().Unix())
 
-	_, err := repo.Client.PutObject(ctx, bucketName, objectName, avatarInfo.Reader, avatarInfo.Size, minio.PutObjectOptions{
+	_, err := repo.client.PutObject(ctx, bucketName, objectName, avatarInfo.Reader, avatarInfo.Size, minio.PutObjectOptions{
 		ContentType: "image/jpg",
 	})
 	if err != nil {
@@ -23,9 +23,9 @@ func (repo *PostgresRepository) UploadAvatar(ctx context.Context, userID uuid.UU
 	}
 
 	// Сохраняем путь к аватару в БД
-	_, err = repo.DB.Exec(ctx, `UPDATE users SET avatar_url = $1 WHERE id = $2`, objectName, userID)
+	_, err = repo.db.Exec(ctx, `UPDATE users SET avatar_url = $1 WHERE id = $2`, objectName, userID)
 	if err != nil {
-		return fmt.Errorf("UploadAvatar: error saving avatar_url in DB: %w", err)
+		return fmt.Errorf("UploadAvatar: error saving avatar_url in db: %w", err)
 	}
 
 	return nil
@@ -34,14 +34,14 @@ func (repo *PostgresRepository) UploadAvatar(ctx context.Context, userID uuid.UU
 // GetAvatarURL - получаем url аватарки по его имени
 func (repo *PostgresRepository) GetAvatarURL(ctx context.Context, bucketName string, userID uuid.UUID) (string, error) {
 	var objectName string
-	err := repo.DB.QueryRow(ctx, `SELECT avatar_url FROM users WHERE id = $1`, userID).Scan(&objectName)
+	err := repo.db.QueryRow(ctx, `SELECT avatar_url FROM users WHERE id = $1`, userID).Scan(&objectName)
 	if err != nil {
-		return "", fmt.Errorf("GetAvatarURL: error fetching avatar_url from DB: %w", err)
+		return "", fmt.Errorf("GetAvatarURL: error fetching avatar_url from db: %w", err)
 	}
 
-	publicEndpoint := repo.Config.MinIoPublicEndpoint
+	publicEndpoint := repo.config.MinIoPublicEndpoint
 	if publicEndpoint == "" {
-		publicEndpoint = repo.Config.MinioEndpoint
+		publicEndpoint = repo.config.MinioEndpoint
 	}
 
 	if objectName == "default" {
