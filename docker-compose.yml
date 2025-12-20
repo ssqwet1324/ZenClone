@@ -1,14 +1,16 @@
 services:
   postgres:
-    image: postgres:15-alpine
-    container_name: users_postgres
+    image: postgres:alpine
+    container_name: postgres
     environment:
-      POSTGRES_DB: postgres
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
       - "5432:5432"
     restart: always
+    volumes:
+      - ./db/init:/docker-entrypoint-initdb.d
+      - postgres_data:/var/lib/postgresql/data
 
   redis:
     image: redis:7-alpine
@@ -17,19 +19,34 @@ services:
       - "6379:6379"
     restart: always
 
-  kafka:
-    image: bitnami/kafka:3.7
-    container_name: kafka
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: zookeeper
     environment:
-      KAFKA_CFG_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
-      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092
-      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      ALLOW_PLAINTEXT_LISTENER: "yes"
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - app-network
+    restart: always
+
+  kafka:
+    image: confluentinc/cp-kafka:7.3.0
+    container_name: kafka
     depends_on:
       - zookeeper
     ports:
       - "9092:9092"
+    networks:
+      - app-network
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     restart: always
 
   kafka-ui:
@@ -43,15 +60,8 @@ services:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
       KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
-    restart: always
-
-  zookeeper:
-    image: bitnami/zookeeper:3.9
-    container_name: zookeeper
-    environment:
-      ALLOW_ANONYMOUS_LOGIN: "yes"
-    ports:
-      - "2181:2181"
+    networks:
+      - app-network
     restart: always
 
   minio:
@@ -68,10 +78,10 @@ services:
       - minio-data:/data
     restart: always
 
-  usersservice:
+  users_service:
     build:
       context: ./UsersService
-    container_name: usersservice
+    container_name: users_service
     depends_on:
       - postgres
     env_file:
@@ -80,25 +90,25 @@ services:
       - "8081:8081"
     restart: always
 
-  authservice:
+  auth_service:
     build:
       context: ./AuthService
-    container_name: authservice
+    container_name: auth_service
     depends_on:
       - redis
-      - usersservice
+      - users_service
     env_file:
       - ./AuthService/.env
     ports:
       - "8080:8080"
     restart: always
 
-  postservice:
+  post_service:
     build:
       context: ./PostService
-    container_name: postservice
+    container_name: post_service
     depends_on:
-      - postpostgres
+      - postgres
       - kafka
     env_file:
       - ./PostService/.env
@@ -106,5 +116,10 @@ services:
       - "8082:8082"
     restart: always
 
+networks:
+  app-network:
+    driver: bridge
+
 volumes:
   minio-data:
+  postgres_data:
