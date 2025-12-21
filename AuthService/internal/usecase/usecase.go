@@ -5,7 +5,6 @@ import (
 	"AuthService/internal/config"
 	"AuthService/internal/entity"
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
@@ -23,15 +22,15 @@ type RepositoryProvider interface {
 	SaveRefreshToken(ctx context.Context, userID, refreshToken string) error
 	GetRefreshToken(ctx context.Context, userID string) (string, error)
 }
-type Service struct {
+type UseCase struct {
 	repo   RepositoryProvider
 	log    *zap.Logger
 	client UsersClient.ClientProvider
 	cfg    *config.Config
 }
 
-func New(repo RepositoryProvider, log *zap.Logger, client UsersClient.ClientProvider, cfg *config.Config) *Service {
-	return &Service{
+func New(repo RepositoryProvider, log *zap.Logger, client UsersClient.ClientProvider, cfg *config.Config) *UseCase {
+	return &UseCase{
 		repo:   repo,
 		log:    log,
 		client: client,
@@ -39,23 +38,27 @@ func New(repo RepositoryProvider, log *zap.Logger, client UsersClient.ClientProv
 	}
 }
 
-// GenerateUserID - генерируем уникальный id пользователя
-func (s *Service) GenerateUserID() string {
+// generateUserID - генерируем уникальный id пользователя
+func generateUserID() string {
 	return uuid.New().String()
 }
 
 // SaveRefreshToken имплементирующем интерфейс
-func (s *Service) SaveRefreshToken(ctx context.Context, userID, refreshToken string) error {
+func (s *UseCase) SaveRefreshToken(ctx context.Context, userID, refreshToken string) error {
 	err := s.repo.SaveRefreshToken(ctx, userID, refreshToken)
 	if err != nil {
-		return fmt.Errorf("save refresh token: %w", err)
+		s.log.Error("Failed to save refresh token",
+			zap.String("userID", userID),
+			zap.Error(err),
+		)
+		return entity.ErrSaveRefreshToken
 	}
 
 	return nil
 }
 
 // GetRefreshToken - имплементирующем интерфейс
-func (s *Service) GetRefreshToken(ctx context.Context, userID string) (string, error) {
+func (s *UseCase) GetRefreshToken(ctx context.Context, userID string) (string, error) {
 	// Пробуем получить из Redis
 	refreshToken, err := s.repo.GetRefreshToken(ctx, userID)
 	if err == nil && refreshToken != "" {
@@ -65,7 +68,11 @@ func (s *Service) GetRefreshToken(ctx context.Context, userID string) (string, e
 	// Если нет в Redis пробуем получить из UsersService
 	token, err := s.client.GetRefreshToken(ctx, UsersClient.TokenRequest{ID: userID})
 	if err != nil || token == "" {
-		return "", fmt.Errorf("get refresh token: not found in Redis and UsersService: %w", err)
+		s.log.Error("Failed to get refresh token from Redis and UsersService",
+			zap.String("userID", userID),
+			zap.Error(err),
+		)
+		return "", entity.ErrGetRefreshToken
 	}
 
 	// Кэшируем обратно в Redis
@@ -74,13 +81,13 @@ func (s *Service) GetRefreshToken(ctx context.Context, userID string) (string, e
 	return token, nil
 }
 
-// GenerateNewRefreshToken - создаем новый refresh токен
-func (s *Service) GenerateNewRefreshToken() string {
+// generateNewRefreshToken - создаем новый refresh токен
+func generateNewRefreshToken() string {
 	return uuid.NewString()
 }
 
 // GenerateAccessToken - создаем новый access(jwt) токен
-func (s *Service) GenerateAccessToken(userID, secretKey string) (string, error) {
+func (s *UseCase) GenerateAccessToken(userID, secretKey string) (string, error) {
 	claims := jwt.MapClaims{
 		"sub": userID,
 		"exp": time.Now().Add(accessTokenTTL).Unix(),
@@ -89,61 +96,75 @@ func (s *Service) GenerateAccessToken(userID, secretKey string) (string, error) 
 
 	tokenString, err := token.SignedString([]byte(secretKey))
 	if err != nil {
-		return "", fmt.Errorf("failed to sign token: %w", err)
+		s.log.Error("GenerateAccessToken: Failed to sign token",
+			zap.String("userID", userID),
+			zap.Error(err),
+		)
+		return "", entity.ErrSignToken
 	}
-
-	s.log.Info("Access token generated successfully", zap.String("userID", userID))
 
 	return tokenString, nil
 }
 
 // UpdateRefreshToken - обновляем устаревший refresh токен пользователя
-func (s *Service) UpdateRefreshToken(ctx context.Context, userID string) (string, error) {
-	newRefreshToken := s.GenerateNewRefreshToken()
+func (s *UseCase) UpdateRefreshToken(ctx context.Context, userID string) (string, error) {
+	newRefreshToken := generateNewRefreshToken()
 	err := s.repo.SaveRefreshToken(ctx, userID, newRefreshToken)
 	if err != nil {
-		return "", fmt.Errorf("save refresh token: %w", err)
+		s.log.Error("UpdateRefreshToken: Failed to save refresh token in UpdateRefreshToken",
+			zap.String("userID", userID),
+			zap.Error(err),
+		)
+		return "", entity.ErrSaveRefreshToken
 	}
-
-	s.log.Info("Update refresh token successfully")
 
 	return newRefreshToken, nil
 }
 
 // ExtractUserIDFromToken взять userID из заголовка токена
-func (s *Service) ExtractUserIDFromToken(tokenStr, secret string) (string, error) {
+func (s *UseCase) ExtractUserIDFromToken(tokenStr, secret string) (string, error) {
 	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
 		//проверяем метод подписи
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			s.log.Error("ExtractUserIDFromToken: Unexpected signing method")
+			return nil, entity.ErrUnexpectedSigningMethod
 		}
 		return []byte(secret), nil
 	})
 
 	if err != nil || !token.Valid {
-		return "", fmt.Errorf("ExtractUserIDFromToken: invalid token: %w", err)
+		s.log.Error("ExtractUserIDFromToken: Invalid token",
+			zap.Error(err),
+		)
+		return "", entity.ErrInvalidToken
 	}
 
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
-		return "", fmt.Errorf("ExtractUserIDFromToken: cannot parse claims")
+		s.log.Error("ExtractUserIDFromToken: Cannot parse claims")
+		return "", entity.ErrCannotParseClaims
 	}
 
 	userID, ok := claims["sub"].(string)
 	if !ok {
-		return "", fmt.Errorf("ExtractUserIDFromToken: userID not found in token claims")
+		s.log.Error("ExtractUserIDFromToken: UserID not found in token claims")
+		return "", entity.ErrUserIDNotFound
 	}
 
 	return userID, nil
 }
 
-// RegisterUser - регистрируем нового пользователя и посылаем данные в Users Service
-func (s *Service) RegisterUser(ctx context.Context, reg entity.RegisterRequest) (string, string, string, error) {
-	userID := s.GenerateUserID()
+// RegisterUser - регистрируем нового пользователя и посылаем данные в Users UseCase
+func (s *UseCase) RegisterUser(ctx context.Context, reg entity.RegisterRequest) (string, string, string, error) {
+	userID := generateUserID()
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(reg.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return "", "", "", fmt.Errorf("RegisterUser: failed to hash password: %w", err)
+		s.log.Error("RegisterUser: Failed to hash password",
+			zap.String("login", reg.Login),
+			zap.Error(err),
+		)
+		return "", "", "", entity.ErrHashPassword
 	}
 
 	err = s.client.AddUser(ctx, UsersClient.RegisterRequest{
@@ -156,44 +177,69 @@ func (s *Service) RegisterUser(ctx context.Context, reg entity.RegisterRequest) 
 		Bio:       reg.Bio,
 	})
 	if err != nil {
-		return "", "", "", fmt.Errorf("RegisterUser: failed to register user: %w", err)
+		s.log.Error("RegisterUser: Failed to register user",
+			zap.String("userID", userID),
+			zap.String("login", reg.Login),
+			zap.Error(err),
+		)
+		return "", "", "", entity.ErrRegisterUser
 	}
 
-	refreshToken := s.GenerateNewRefreshToken()
+	refreshToken := generateNewRefreshToken()
 	err = s.repo.SaveRefreshToken(ctx, userID, refreshToken)
 	if err != nil {
-		return "", "", "", fmt.Errorf("RegisterUser: failed to save refresh token: %w", err)
+		s.log.Error("RegisterUser: Failed to save refresh token in RegisterUser",
+			zap.String("userID", userID),
+			zap.Error(err),
+		)
+		return "", "", "", entity.ErrSaveRefreshToken
 	}
 
 	accessToken, err := s.GenerateAccessToken(userID, s.cfg.JWTSecret)
 	if err != nil {
-		return "", "", "", fmt.Errorf("RegisterUser: failed to generate access token: %w", err)
+		s.log.Error("RegisterUser: Failed to generate access token in RegisterUser",
+			zap.String("userID", userID),
+			zap.Error(err),
+		)
+		return "", "", "", entity.ErrGenerateAccessToken
 	}
 
 	return userID, accessToken, refreshToken, nil
 }
 
 // LoginAccount - входим в аккаунт и отдаем новые токены
-func (s *Service) LoginAccount(ctx context.Context, login, password string) (string, string, string, error) {
+func (s *UseCase) LoginAccount(ctx context.Context, login, password string) (string, string, string, error) {
 	userID, err := s.client.CompareAuthData(ctx, UsersClient.AuthRequest{
 		Login:    login,
 		Password: password,
 	})
 
 	if err != nil {
-		return "", "", "", fmt.Errorf("LoginAccount: failed to compare auth data: %w", err)
+		s.log.Error("LoginAccount: Failed to compare auth data",
+			zap.String("login", login),
+			zap.Error(err),
+		)
+		return "", "", "", entity.ErrCompareAuthData
 	}
 
 	//обновляем токен в redis
 	newRefreshToken, err := s.UpdateRefreshToken(ctx, userID)
 	if err != nil {
-		return "", "", "", fmt.Errorf("LoginAccount: failed to update refresh token: %w", err)
+		s.log.Error("LoginAccount: Failed to update refresh token in LoginAccount",
+			zap.String("userID", userID),
+			zap.Error(err),
+		)
+		return "", "", "", entity.ErrUpdateRefreshToken
 	}
 
-	////обновляем токен в redis
+	//обновляем токен в redis
 	newAccessToken, err := s.GenerateAccessToken(userID, s.cfg.JWTSecret)
 	if err != nil {
-		return "", "", "", fmt.Errorf("LoginAccount: failed to generate access token: %w", err)
+		s.log.Error("LoginAccount: Failed to generate access token in LoginAccount",
+			zap.String("userID", userID),
+			zap.Error(err),
+		)
+		return "", "", "", entity.ErrGenerateAccessToken
 	}
 
 	// обновляем токен через клиента UpdateRefreshToken
@@ -208,10 +254,11 @@ func (s *Service) LoginAccount(ctx context.Context, login, password string) (str
 }
 
 // RefreshTokens - Отдаем новые токены
-func (s *Service) RefreshTokens(ctx context.Context, refreshToken, authHeader string) (string, string, error) {
+func (s *UseCase) RefreshTokens(ctx context.Context, refreshToken, authHeader string) (string, string, error) {
 	parts := strings.Split(authHeader, " ")
 	if len(parts) != 2 || parts[0] != "Bearer" {
-		return "", "", fmt.Errorf("RefreshTokens: invalid authorization header")
+		s.log.Error("RefreshTokens: Invalid authorization header")
+		return "", "", entity.ErrInvalidAuthHeader
 	}
 
 	tokenString := parts[1]
@@ -219,14 +266,17 @@ func (s *Service) RefreshTokens(ctx context.Context, refreshToken, authHeader st
 	// Get userID from access token
 	userID, err := s.ExtractUserIDFromToken(tokenString, s.cfg.JWTSecret)
 	if err != nil {
-		return "", "", fmt.Errorf("RefreshTokens: invalid access token: %w", err)
+		s.log.Error("RefreshTokens: Invalid access token in RefreshTokens",
+			zap.Error(err),
+		)
+		return "", "", entity.ErrInvalidToken
 	}
 
 	// Получаем сохраненный refresh token
 	storedRefreshToken, err := s.GetRefreshToken(ctx, userID)
 	if err != nil || storedRefreshToken == "" {
 		// Если не найден — генерируем новый, сохраняем в Redis и обновляем в UsersService
-		newRefreshToken := s.GenerateNewRefreshToken()
+		newRefreshToken := generateNewRefreshToken()
 		_ = s.SaveRefreshToken(ctx, userID, newRefreshToken)
 		_ = s.client.UpdateRefreshToken(ctx, UsersClient.UpdateRefreshTokenRequest{
 			ID:           userID,
@@ -237,13 +287,20 @@ func (s *Service) RefreshTokens(ctx context.Context, refreshToken, authHeader st
 
 	// Сравниваем токены
 	if storedRefreshToken != refreshToken {
-		return "", "", fmt.Errorf("RefreshTokens: refresh token mismatch")
+		s.log.Error("RefreshTokens: Refresh token mismatch",
+			zap.String("userID", userID),
+		)
+		return "", "", entity.ErrRefreshTokenMismatch
 	}
 
 	// Generate a new refresh token
-	newRefreshToken := s.GenerateNewRefreshToken()
+	newRefreshToken := generateNewRefreshToken()
 	if err := s.SaveRefreshToken(ctx, userID, newRefreshToken); err != nil {
-		return "", "", fmt.Errorf("RefreshTokens: failed to save refresh token: %w", err)
+		s.log.Error("RefreshTokens: Failed to save refresh token in RefreshTokens",
+			zap.String("userID", userID),
+			zap.Error(err),
+		)
+		return "", "", entity.ErrSaveRefreshToken
 	}
 	_ = s.client.UpdateRefreshToken(ctx, UsersClient.UpdateRefreshTokenRequest{
 		ID:           userID,
@@ -253,7 +310,11 @@ func (s *Service) RefreshTokens(ctx context.Context, refreshToken, authHeader st
 	// Generate a new access token
 	newAccessToken, err := s.GenerateAccessToken(userID, s.cfg.JWTSecret)
 	if err != nil {
-		return "", "", fmt.Errorf("RefreshTokens: failed to generate access token: %w", err)
+		s.log.Error("RefreshTokens: Failed to generate access token in RefreshTokens",
+			zap.String("userID", userID),
+			zap.Error(err),
+		)
+		return "", "", entity.ErrGenerateAccessToken
 	}
 
 	return newRefreshToken, newAccessToken, nil
