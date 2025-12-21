@@ -8,8 +8,6 @@ import (
 	"PostService/internal/repository"
 	"PostService/internal/usecase"
 	"context"
-	"fmt"
-	"log"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -27,7 +25,6 @@ func Run() {
 	if err != nil {
 		logger.Fatal("can't initialize config", zap.Error(err))
 	}
-	fmt.Println(cfg.CreateDsn())
 
 	userMiddleware := middleware.JWTAuthMiddleware(cfg)
 
@@ -38,9 +35,9 @@ func Run() {
 
 	producer := kafka.New([]string{cfg.KafkaAddr}, cfg.KafkaTopic)
 
-	postService := usecase.New(repo, cfg, producer)
+	postService := usecase.New(repo, cfg, producer, logger)
 
-	postHandler := handler.New(postService)
+	postHandler := handler.New(postService, logger)
 
 	apiV1 := server.Group("/api/v1/posts")
 	{
@@ -51,6 +48,6 @@ func Run() {
 	}
 
 	if err := server.Run(":8082"); err != nil {
-		log.Fatal(err)
+		logger.Fatal("failed to run http server", zap.Error(err))
 	}
 }

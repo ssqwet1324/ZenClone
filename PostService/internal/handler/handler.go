@@ -3,144 +3,219 @@ package handler
 import (
 	"PostService/internal/entity"
 	"PostService/internal/usecase"
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
 
 type PostHandler struct {
-	uc *usecase.PostUseCase
+	uc  *usecase.PostUseCase
+	log *zap.Logger
 }
 
-func New(uc *usecase.PostUseCase) *PostHandler {
-	return &PostHandler{uc: uc}
+func New(uc *usecase.PostUseCase, log *zap.Logger) *PostHandler {
+	return &PostHandler{
+		uc:  uc,
+		log: log.Named("Handler"),
+	}
 }
 
-func (h *PostHandler) CreatePost(ctx *gin.Context) {
+// SuccessResponse - единый формат успешного ответа
+type SuccessResponse struct {
+	Message string      `json:"message"`
+	Data    interface{} `json:"data,omitempty"`
+}
+
+// getUserUUID - достает userID из контекста и парсит в UUID
+func getUserUUID(ctx *gin.Context) (uuid.UUID, *entity.ErrorResponse) {
 	userIDRaw, exists := ctx.Get("userID")
 	if !exists {
-		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "userID not found in context"})
-		return
+		return uuid.Nil, &entity.ErrorResponse{
+			Error: entity.ErrorDetail{Code: "UNAUTHORIZED",
+				Message: "userID not found in context",
+			},
+		}
 	}
 
 	userIDStr, ok := userIDRaw.(string)
 	if !ok {
-		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "userID has wrong type"})
-		return
+		return uuid.Nil, &entity.ErrorResponse{
+			Error: entity.ErrorDetail{Code: "UNAUTHORIZED",
+				Message: "userID has wrong type",
+			},
+		}
 	}
 
 	userUUID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "invalid userID format"})
+		return uuid.Nil, &entity.ErrorResponse{
+			Error: entity.ErrorDetail{Code: "INVALID_USER_ID",
+				Message: "invalid userID format",
+			},
+		}
+	}
+
+	return userUUID, nil
+}
+
+// handlePostError - унифицированная обработка ошибок
+func handlePostError(ctx *gin.Context, err error) {
+	switch {
+	case errors.Is(err, entity.ErrEmptyTitle):
+		ctx.JSON(http.StatusBadRequest, entity.ErrorResponse{Error: entity.ErrorDetail{Code: "EMPTY_TITLE", Message: "Post title cannot be empty"}})
+	case errors.Is(err, entity.ErrEmptyContent):
+		ctx.JSON(http.StatusBadRequest, entity.ErrorResponse{Error: entity.ErrorDetail{Code: "EMPTY_CONTENT", Message: "Post content cannot be empty"}})
+	case errors.Is(err, entity.ErrPostNotOwned):
+		ctx.JSON(http.StatusForbidden, entity.ErrorResponse{Error: entity.ErrorDetail{Code: "POST_NOT_OWNED", Message: "Post does not belong to user"}})
+	case errors.Is(err, entity.ErrPostsNotFound):
+		ctx.JSON(http.StatusNotFound, entity.ErrorResponse{Error: entity.ErrorDetail{Code: "POSTS_NOT_FOUND", Message: "User posts not found"}})
+	case errors.Is(err, entity.ErrInternalError):
+		ctx.JSON(http.StatusInternalServerError, entity.ErrorResponse{Error: entity.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Internal server error"}})
+	default:
+		ctx.JSON(http.StatusInternalServerError, entity.ErrorResponse{Error: entity.ErrorDetail{Code: "INTERNAL_ERROR", Message: "An unexpected error occurred"}})
+	}
+}
+
+// CreatePost - создание поста
+func (h *PostHandler) CreatePost(ctx *gin.Context) {
+	userUUID, errResp := getUserUUID(ctx)
+	if errResp != nil {
+		ctx.JSON(http.StatusUnauthorized, errResp)
 		return
 	}
 
 	var req entity.CreatePostRequest
-
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		h.log.Error("CreatePost: error binding JSON request", zap.Error(err))
+		ctx.JSON(http.StatusInternalServerError, entity.ErrorResponse{
+			Error: entity.ErrorDetail{
+				Code:    "INTERNAL_ERROR",
+				Message: entity.ErrInternalError.Error(),
+			},
+		})
 		return
 	}
 
-	postID, err := h.uc.CreatePost(ctx, userUUID, req)
+	post, err := h.uc.CreatePost(ctx.Request.Context(), userUUID, req)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		handlePostError(ctx, err)
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{"id": postID.ID.String()})
+	ctx.JSON(http.StatusCreated, SuccessResponse{
+		Message: "Post created successfully",
+		Data: gin.H{
+			"id":         post.ID.String(),
+			"title":      post.Title,
+			"content":    post.Content,
+			"author_id":  post.AuthorID.String(),
+			"created_at": post.CreatedAt,
+		},
+	})
 }
 
+// UpdatePost - обновление поста
 func (h *PostHandler) UpdatePost(ctx *gin.Context) {
-	postID := ctx.Param("postID")
-	postIdUUID, err := uuid.Parse(postID)
+	postUUID, err := uuid.Parse(ctx.Param("postID"))
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		h.log.Error("UpdatePost: error parsing postID", zap.Error(err))
+		ctx.JSON(http.StatusBadRequest, entity.ErrorResponse{
+			Error: entity.ErrorDetail{Code: "INVALID_POST_ID",
+				Message: entity.ErrInternalError.Error(),
+			},
+		})
 		return
 	}
 
-	userIDRaw, exists := ctx.Get("userID")
-	if !exists {
-		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "userID not found in context"})
-		return
-	}
-
-	userIDStr, ok := userIDRaw.(string)
-	if !ok {
-		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "userID has wrong type"})
-		return
-	}
-
-	userUUID, err := uuid.Parse(userIDStr)
-	if err != nil {
-		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "invalid userID format"})
+	userUUID, errResp := getUserUUID(ctx)
+	if errResp != nil {
+		ctx.JSON(http.StatusUnauthorized, errResp)
 		return
 	}
 
 	var req entity.UpdateUserPostRequest
-
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		h.log.Error("UpdatePost: error binding JSON request", zap.Error(err))
+		ctx.JSON(http.StatusInternalServerError, entity.ErrorResponse{
+			Error: entity.ErrorDetail{
+				Code:    "INTERNAL_ERROR",
+				Message: entity.ErrInternalError.Error(),
+			},
+		})
 		return
 	}
 
-	err = h.uc.UpdatePost(ctx, postIdUUID, userUUID, req)
+	err = h.uc.UpdatePost(ctx.Request.Context(), postUUID, userUUID, req)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		handlePostError(ctx, err)
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{"post updated": postID})
+	ctx.JSON(http.StatusOK, SuccessResponse{
+		Message: "Post updated successfully",
+		Data:    gin.H{"post_id": postUUID.String()}},
+	)
 }
 
+// DeletePost - удаление поста
 func (h *PostHandler) DeletePost(ctx *gin.Context) {
-	postID := ctx.Param("postID")
-	postIdUUID, err := uuid.Parse(postID)
+	postUUID, err := uuid.Parse(ctx.Param("postID"))
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusBadRequest, entity.ErrorResponse{
+			Error: entity.ErrorDetail{
+				Code:    "INVALID_POST_ID",
+				Message: "Invalid post ID format",
+			},
+		})
 		return
 	}
 
-	userIDRaw, exists := ctx.Get("userID")
-	if !exists {
-		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "userID not found in context"})
+	userUUID, errResp := getUserUUID(ctx)
+	if errResp != nil {
+		ctx.JSON(http.StatusUnauthorized, errResp)
 		return
 	}
 
-	userIDStr, ok := userIDRaw.(string)
-	if !ok {
-		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "userID has wrong type"})
-		return
-	}
-
-	userUUID, err := uuid.Parse(userIDStr)
+	err = h.uc.DeletePost(ctx.Request.Context(), postUUID, userUUID)
 	if err != nil {
-		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "invalid userID format"})
+		handlePostError(ctx, err)
 		return
 	}
 
-	err = h.uc.DeletePost(ctx, postIdUUID, userUUID)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	ctx.JSON(http.StatusOK, gin.H{"post deleted": postID})
+	ctx.JSON(http.StatusOK, SuccessResponse{
+		Message: "Post deleted successfully",
+		Data:    gin.H{"post_id": postUUID.String()},
+	})
 }
 
+// GetPostsUser - получение всех постов пользователя
 func (h *PostHandler) GetPostsUser(ctx *gin.Context) {
-	userID := ctx.Param("userID")
-	userUUID, err := uuid.Parse(userID)
+	userUUID, err := uuid.Parse(ctx.Param("userID"))
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		h.log.Error("GetPostsUser: error parsing user UUID", zap.Error(err))
+		ctx.JSON(http.StatusBadRequest, entity.ErrorResponse{
+			Error: entity.ErrorDetail{
+				Code:    "INVALID_USER_ID",
+				Message: "Invalid user ID format",
+			},
+		})
 		return
 	}
 
-	data, err := h.uc.GetPostsUser(ctx, userUUID)
+	data, err := h.uc.GetPostsUser(ctx.Request.Context(), userUUID)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		handlePostError(ctx, err)
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{"posts": data.Posts})
+	ctx.JSON(http.StatusOK, SuccessResponse{
+		Message: "Posts retrieved successfully",
+		Data: gin.H{
+			"posts": data.Posts,
+			"count": len(data.Posts),
+		},
+	})
 }

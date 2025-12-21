@@ -1,8 +1,10 @@
 package entity
 
 import (
-	"github.com/google/uuid"
+	"errors"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type CreatePostRequest struct {
@@ -41,3 +43,31 @@ type PostResponse struct {
 type PostListResponse struct {
 	Posts []PostResponse `json:"posts"`
 }
+
+// ErrorResponse - ответ ошибки
+type ErrorResponse struct {
+	Error ErrorDetail `json:"error"`
+}
+
+// ErrorDetail - информация об ошибке
+type ErrorDetail struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+var (
+	// ErrPostNotOwned - пост не принадлежит пользователю
+	ErrPostNotOwned = errors.New("post does not belong to user")
+
+	// ErrPostsNotFound - посты пользователя не найдены
+	ErrPostsNotFound = errors.New("user posts not found")
+
+	// ErrEmptyTitle - пустой заголовок поста
+	ErrEmptyTitle = errors.New("post title cannot be empty")
+
+	// ErrEmptyContent - пустое содержимое поста
+	ErrEmptyContent = errors.New("post content cannot be empty")
+
+	// ErrInternalError - общая ошибка
+	ErrInternalError = errors.New("internal error")
+)

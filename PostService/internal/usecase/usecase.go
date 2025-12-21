@@ -6,9 +6,9 @@ import (
 	"PostService/internal/kafka"
 	"context"
 	"encoding/json"
-	"fmt"
 
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
 
 // RepositoryProvider - функции из repository
@@ -24,19 +24,32 @@ type PostUseCase struct {
 	producer *kafka.Producer
 	repo     RepositoryProvider
 	cfg      *config.Config
+	log      *zap.Logger
 }
 
 // New - конструктор бизнес логики
-func New(repo RepositoryProvider, cfg *config.Config, producer *kafka.Producer) *PostUseCase {
+func New(repo RepositoryProvider, cfg *config.Config, producer *kafka.Producer, log *zap.Logger) *PostUseCase {
 	return &PostUseCase{
 		producer: producer,
 		repo:     repo,
 		cfg:      cfg,
+		log:      log.Named("UseCase"),
 	}
 }
 
 // CreatePost - создаем пост и отправляем в FeedService
 func (s *PostUseCase) CreatePost(ctx context.Context, creatorUserID uuid.UUID, createPost entity.CreatePostRequest) (*entity.CreatePostResponse, error) {
+	// Валидация данных
+	if createPost.Title == "" {
+		s.log.Error("CreatePost: empty title", zap.String("author_id", creatorUserID.String()))
+		return nil, entity.ErrEmptyTitle
+	}
+
+	if createPost.Content == "" {
+		s.log.Error("CreatePost: empty content", zap.String("author_id", creatorUserID.String()))
+		return nil, entity.ErrEmptyContent
+	}
+
 	var createPostResponse entity.CreatePostResponse
 
 	postID := uuid.New()
@@ -48,18 +61,27 @@ func (s *PostUseCase) CreatePost(ctx context.Context, creatorUserID uuid.UUID, c
 
 	createdPost, err := s.repo.CreatePost(ctx, createPostResponse)
 	if err != nil {
-		return nil, fmt.Errorf("CreatePost usecase: error create data: %w", err)
+		s.log.Error("CreatePost: error creating post in repository",
+			zap.String("post_id", postID.String()),
+			zap.String("author_id", creatorUserID.String()),
+			zap.Error(err))
+		return nil, entity.ErrInternalError
 	}
 
 	postBytes, err := json.Marshal(createdPost)
 	if err != nil {
-		return nil, fmt.Errorf("CreatePost usecase: error marshal data: %w", err)
+		s.log.Error("CreatePost: error marshaling post",
+			zap.String("post_id", createdPost.ID.String()),
+			zap.Error(err))
+		return nil, entity.ErrInternalError
 	}
 
 	err = s.producer.WriteMessages(ctx, createdPost.ID.String(), postBytes)
-
 	if err != nil {
-		return nil, fmt.Errorf("CreatePost usecase: error write data: %w", err)
+		s.log.Error("CreatePost: error writing to kafka",
+			zap.String("post_id", createdPost.ID.String()),
+			zap.Error(err))
+		return nil, entity.ErrInternalError
 	}
 
 	return createdPost, nil
@@ -69,17 +91,24 @@ func (s *PostUseCase) CreatePost(ctx context.Context, creatorUserID uuid.UUID, c
 func (s *PostUseCase) UpdatePost(ctx context.Context, postID uuid.UUID, authorID uuid.UUID, updateReq entity.UpdateUserPostRequest) error {
 	data, err := s.repo.UpdatePost(ctx, postID, authorID, updateReq)
 	if err != nil {
-		return fmt.Errorf("UpdatePost usecase: error update data: %w", err)
+		s.log.Error("UpdatePost: error updating post")
+		return entity.ErrInternalError
 	}
 
 	postBytes, err := json.Marshal(data)
 	if err != nil {
-		return fmt.Errorf("UpdatePost usecase: error marshal data: %w", err)
+		s.log.Error("UpdatePost: error marshaling post",
+			zap.String("post_id", postID.String()),
+			zap.Error(err))
+		return entity.ErrInternalError
 	}
 
 	err = s.producer.WriteMessages(ctx, postID.String(), postBytes)
 	if err != nil {
-		return fmt.Errorf("UpdatePost usecase: error write data: %w", err)
+		s.log.Error("UpdatePost: error writing to kafka",
+			zap.String("post_id", postID.String()),
+			zap.Error(err))
+		return entity.ErrInternalError
 	}
 
 	return nil
@@ -89,12 +118,15 @@ func (s *PostUseCase) UpdatePost(ctx context.Context, postID uuid.UUID, authorID
 func (s *PostUseCase) DeletePost(ctx context.Context, postID uuid.UUID, userID uuid.UUID) error {
 	err := s.repo.DeletePost(ctx, postID, userID)
 	if err != nil {
-		return fmt.Errorf("DeletePost usecase: error delete post: %w", err)
+		return entity.ErrInternalError
 	}
 
 	err = s.producer.WriteMessages(ctx, postID.String(), []byte("deleted post:"+postID.String()))
 	if err != nil {
-		return fmt.Errorf("DeletePost usecase: error write data: %w", err)
+		s.log.Error("DeletePost: error writing to kafka",
+			zap.String("post_id", postID.String()),
+			zap.Error(err))
+		return entity.ErrInternalError
 	}
 
 	return nil
@@ -104,11 +136,16 @@ func (s *PostUseCase) DeletePost(ctx context.Context, postID uuid.UUID, userID u
 func (s *PostUseCase) GetPostsUser(ctx context.Context, authorID uuid.UUID) (*entity.PostListResponse, error) {
 	rows, err := s.repo.GetPostsUser(ctx, authorID)
 	if err != nil {
-		return nil, fmt.Errorf("GetPostsUser usecase: error get posts user: %w", err)
+		s.log.Error("GetPostsUser: error getting posts from repository",
+			zap.String("author_id", authorID.String()),
+			zap.Error(err))
+		return nil, entity.ErrInternalError
 	}
 
-	if rows.Posts == nil {
-		return &entity.PostListResponse{}, fmt.Errorf("GetPostsUser usecase: posts user not found")
+	if len(rows.Posts) == 0 {
+		s.log.Warn("GetPostsUser: posts not found",
+			zap.String("author_id", authorID.String()))
+		return &entity.PostListResponse{}, entity.ErrPostsNotFound
 	}
 
 	return rows, nil
