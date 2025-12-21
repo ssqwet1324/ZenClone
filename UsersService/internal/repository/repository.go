@@ -4,7 +4,6 @@ import (
 	"UsersService/internal/config"
 	"UsersService/internal/entity"
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -17,7 +16,6 @@ import (
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
-	"go.uber.org/zap"
 )
 
 const (
@@ -29,23 +27,17 @@ type PostgresRepository struct {
 	db     *pgx.Conn
 	client *minio.Client
 	config *config.Config
-	logger *zap.Logger
 }
 
 // Init - инициализация repository
-func Init(ctx context.Context, cfg *config.Config, log *zap.Logger) (*PostgresRepository, error) {
+func Init(ctx context.Context, cfg *config.Config) (*PostgresRepository, error) {
 	conn, err := pgx.Connect(ctx, cfg.CreateDsn())
 	if err != nil {
 		return nil, fmt.Errorf("PostgresRepository: Error connecting to PostService: %v", err)
 	}
 
 	sqlDb := stdlib.OpenDB(*conn.Config())
-	defer func(sqlDb *sql.DB) {
-		err := sqlDb.Close()
-		if err != nil {
-			log.Warn("PostgresRepository: Error closing PostService", zap.Error(err))
-		}
-	}(sqlDb)
+	defer sqlDb.Close()
 
 	driver, err := postgres.WithInstance(sqlDb, &postgres.Config{})
 	if err != nil {
@@ -65,8 +57,6 @@ func Init(ctx context.Context, cfg *config.Config, log *zap.Logger) (*PostgresRe
 		return nil, fmt.Errorf("failed to run migrations: %w", err)
 	}
 
-	log.Info("Migration initialized successfully")
-
 	minioClient, err := minio.New(cfg.MinioEndpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(cfg.MinioAccessKey, cfg.MinioSecretKey, ""),
 		Secure: cfg.MinioUseSSl,
@@ -76,13 +66,10 @@ func Init(ctx context.Context, cfg *config.Config, log *zap.Logger) (*PostgresRe
 		return nil, fmt.Errorf("PostgresRepository: error initializing MinIO client: %v", err)
 	}
 
-	log.Info("Successfully initialized MinIO client")
-
 	return &PostgresRepository{
 		db:     conn,
 		client: minioClient,
 		config: cfg,
-		logger: log.Named("Repository"),
 	}, nil
 }
 
@@ -103,6 +90,21 @@ func (repo *PostgresRepository) AddUser(ctx context.Context, addUserInfo entity.
 	}
 
 	return nil
+}
+
+// CheckUser - проверяем существует ли пользователь
+func (repo *PostgresRepository) CheckUser(ctx context.Context, username string) (bool, error) {
+	var exists int
+
+	err := repo.db.QueryRow(ctx, `SELECT 1 FROM users WHERE username=$1`, username).Scan(&exists)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	return true, nil
 }
 
 // GetLoginByUserID - получаем логин по id пользователя

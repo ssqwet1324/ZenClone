@@ -27,7 +27,7 @@ func Run() {
 
 	userMiddleware := middleware.JWTAuthMiddleware(cfg)
 
-	repo, err := repository.Init(context.Background(), cfg, logger)
+	repo, err := repository.Init(context.Background(), cfg)
 	if err != nil {
 		logger.Fatal("can't initialize repository", zap.Error(err))
 	}
