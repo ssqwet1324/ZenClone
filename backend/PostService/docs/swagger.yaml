@@ -1,0 +1,276 @@
+basePath: /api
+definitions:
+  entity.CreatePostRequest:
+    properties:
+      content:
+        type: string
+      title:
+        type: string
+    type: object
+  entity.CreatePostResponseData:
+    properties:
+      author_id:
+        type: string
+      content:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      title:
+        type: string
+    type: object
+  entity.CreatePostSuccessResponse:
+    properties:
+      data:
+        $ref: '#/definitions/entity.CreatePostResponseData'
+      message:
+        type: string
+    type: object
+  entity.DeletePostResponseData:
+    properties:
+      post_id:
+        type: string
+    type: object
+  entity.DeletePostSuccessResponse:
+    properties:
+      data:
+        $ref: '#/definitions/entity.DeletePostResponseData'
+      message:
+        type: string
+    type: object
+  entity.ErrorDetail:
+    properties:
+      code:
+        type: string
+      message:
+        type: string
+    type: object
+  entity.ErrorResponse:
+    properties:
+      error:
+        $ref: '#/definitions/entity.ErrorDetail'
+    type: object
+  entity.GetPostsUserResponseData:
+    properties:
+      count:
+        type: integer
+      posts:
+        items:
+          $ref: '#/definitions/entity.PostResponse'
+        type: array
+    type: object
+  entity.GetPostsUserSuccessResponse:
+    properties:
+      data:
+        $ref: '#/definitions/entity.GetPostsUserResponseData'
+      message:
+        type: string
+    type: object
+  entity.PostResponse:
+    properties:
+      content:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  entity.UpdatePostResponseData:
+    properties:
+      post_id:
+        type: string
+    type: object
+  entity.UpdatePostSuccessResponse:
+    properties:
+      data:
+        $ref: '#/definitions/entity.UpdatePostResponseData'
+      message:
+        type: string
+    type: object
+  entity.UpdateUserPostRequest:
+    properties:
+      content:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+    type: object
+host: localhost:8082
+info:
+  contact: {}
+  description: Сервис управления постами
+  title: Post Service API
+  version: "1.0"
+paths:
+  /api/v1/posts/by-user/{userID}:
+    get:
+      consumes:
+      - application/json
+      description: Получает список всех постов указанного пользователя
+      parameters:
+      - description: ID пользователя
+        in: path
+        name: userID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Список постов успешно получен
+          schema:
+            $ref: '#/definitions/entity.GetPostsUserSuccessResponse'
+        "400":
+          description: Некорректный запрос
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "404":
+          description: Посты не найдены
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+      summary: Получение всех постов пользователя
+      tags:
+      - posts
+  /api/v1/posts/create:
+    post:
+      consumes:
+      - application/json
+      description: Создает новый пост для текущего пользователя
+      parameters:
+      - default: Bearer
+        description: Bearer токен
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Данные для создания поста
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/entity.CreatePostRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Пост успешно создан
+          schema:
+            $ref: '#/definitions/entity.CreatePostSuccessResponse'
+        "400":
+          description: Некорректный запрос или пустые поля
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "401":
+          description: Неавторизован
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+      summary: Создание поста
+      tags:
+      - posts
+  /api/v1/posts/delete/{postID}:
+    delete:
+      consumes:
+      - application/json
+      description: Удаляет пост текущего пользователя
+      parameters:
+      - default: Bearer
+        description: Bearer токен
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: ID поста для удаления
+        in: path
+        name: postID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Пост успешно удален
+          schema:
+            $ref: '#/definitions/entity.DeletePostSuccessResponse'
+        "400":
+          description: Некорректный запрос
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "401":
+          description: Неавторизован
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "403":
+          description: Пост не принадлежит пользователю
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+      summary: Удаление поста
+      tags:
+      - posts
+  /api/v1/posts/update/{postID}:
+    post:
+      consumes:
+      - application/json
+      description: Обновляет существующий пост текущего пользователя
+      parameters:
+      - default: Bearer
+        description: Bearer токен
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: ID поста для обновления
+        in: path
+        name: postID
+        required: true
+        type: string
+      - description: Данные для обновления поста
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/entity.UpdateUserPostRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Пост успешно обновлен
+          schema:
+            $ref: '#/definitions/entity.UpdatePostSuccessResponse'
+        "400":
+          description: Некорректный запрос или пустые поля
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "401":
+          description: Неавторизован
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "403":
+          description: Пост не принадлежит пользователю
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+      summary: Обновление поста
+      tags:
+      - posts
+swagger: "2.0"
