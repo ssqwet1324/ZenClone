@@ -1,40 +1,18 @@
 package entity
 
-import "errors"
+import (
+	"fmt"
+)
 
-// LoginUserInfo - данные для входа
+//..................User Requests & Responses...............
+
+// LoginUserInfo - данные для входа пользователя
 type LoginUserInfo struct {
 	Login    string `json:"login"`
 	Password string `json:"password"`
 }
 
-// RegisterResponse - ответ на регистрацию
-type RegisterResponse struct {
-	ID           string `json:"id"`
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-}
-
-// LoginResponse - ответ на логин
-type LoginResponse struct {
-	ID           string `json:"id"`
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-}
-
-// RefreshResponse - ответ на обновление токенов
-type RefreshResponse struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-}
-
-// TokenRequest - получение токена
-type TokenRequest struct {
-	ID           string `json:"id"`
-	RefreshToken string `json:"refresh_token"`
-}
-
-// RegisterRequest - информация для регистрации
+// RegisterRequest - данные для регистрации нового пользователя
 type RegisterRequest struct {
 	Login     string `json:"login"`
 	Password  string `json:"password"`
@@ -44,32 +22,46 @@ type RegisterRequest struct {
 	Bio       string `json:"bio"`
 }
 
-// ErrorResponse - ответ ошибки
-type ErrorResponse struct {
-	Error ErrorDetail `json:"error"`
+// RegisterResponse - ответ сервиса на регистрацию
+type RegisterResponse struct {
+	ID           string `json:"id"`
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
 }
 
-// ErrorDetail - информация об ошибке
+// LoginResponse - ответ сервиса на авторизацию
+type LoginResponse struct {
+	ID           string `json:"id"`
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+}
+
+// RefreshResponse - ответ сервиса при обновлении токенов
+type RefreshResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+}
+
+// TokenRequest - запрос на получение/проверку токена
+type TokenRequest struct {
+	ID           string `json:"id"`
+	RefreshToken string `json:"refresh_token"`
+}
+
+//..................Errors from Service........................
+
+// ErrorResponse - стандартная структура ошибки от UsersService
+type ErrorResponse struct {
+	ErrorDetail ErrorDetail `json:"error"`
+}
+
+// ErrorDetail - подробности ошибки
 type ErrorDetail struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
 }
 
-// Ошибки для usecase
-var (
-	ErrSaveRefreshToken        = errors.New("save refresh token")
-	ErrGetRefreshToken         = errors.New("get refresh token: not found in Redis and UsersService")
-	ErrSignToken               = errors.New("failed to sign token")
-	ErrUnexpectedSigningMethod = errors.New("unexpected signing method")
-	ErrInvalidToken            = errors.New("invalid token")
-	ErrCannotParseClaims       = errors.New("cannot parse claims")
-	ErrUserIDNotFound          = errors.New("userID not found in token claims")
-	ErrHashPassword            = errors.New("failed to hash password")
-	ErrRegisterUser            = errors.New("failed to register user")
-	ErrGenerateAccessToken     = errors.New("failed to generate access token")
-	ErrCompareAuthData         = errors.New("failed to compare auth data")
-	ErrUpdateRefreshToken      = errors.New("failed to update refresh token")
-	ErrInvalidAuthHeader       = errors.New("invalid authorization header")
-	ErrRefreshTokenMismatch    = errors.New("refresh token mismatch")
-	ErrInternalServer          = errors.New("internal server error")
-)
+// Error реализует интерфейс error для ErrorResponse
+func (e ErrorResponse) Error() string {
+	return fmt.Sprintf("code: %s, message: %s", e.ErrorDetail.Code, e.ErrorDetail.Message)
+}

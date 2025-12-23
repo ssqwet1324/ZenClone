@@ -49,7 +49,6 @@ func (s *UseCase) SaveRefreshToken(ctx context.Context, userID, refreshToken str
 	if err != nil {
 		s.log.Error("Failed to save refresh token",
 			zap.String("userID", userID),
-			zap.Error(err),
 		)
 		return entity.ErrSaveRefreshToken
 	}
@@ -70,7 +69,6 @@ func (s *UseCase) GetRefreshToken(ctx context.Context, userID string) (string, e
 	if err != nil || token == "" {
 		s.log.Error("Failed to get refresh token from Redis and UsersService",
 			zap.String("userID", userID),
-			zap.Error(err),
 		)
 		return "", entity.ErrGetRefreshToken
 	}
@@ -98,7 +96,6 @@ func (s *UseCase) GenerateAccessToken(userID, secretKey string) (string, error) 
 	if err != nil {
 		s.log.Error("GenerateAccessToken: Failed to sign token",
 			zap.String("userID", userID),
-			zap.Error(err),
 		)
 		return "", entity.ErrSignToken
 	}
@@ -113,7 +110,6 @@ func (s *UseCase) UpdateRefreshToken(ctx context.Context, userID string) (string
 	if err != nil {
 		s.log.Error("UpdateRefreshToken: Failed to save refresh token in UpdateRefreshToken",
 			zap.String("userID", userID),
-			zap.Error(err),
 		)
 		return "", entity.ErrSaveRefreshToken
 	}
@@ -162,7 +158,6 @@ func (s *UseCase) RegisterUser(ctx context.Context, reg entity.RegisterRequest) 
 	if err != nil {
 		s.log.Error("RegisterUser: Failed to hash password",
 			zap.String("login", reg.Login),
-			zap.Error(err),
 		)
 		return "", "", "", entity.ErrHashPassword
 	}
@@ -182,7 +177,7 @@ func (s *UseCase) RegisterUser(ctx context.Context, reg entity.RegisterRequest) 
 			zap.String("login", reg.Login),
 			zap.Error(err),
 		)
-		return "", "", "", entity.ErrRegisterUser
+		return "", "", "", err
 	}
 
 	refreshToken := generateNewRefreshToken()
@@ -190,7 +185,6 @@ func (s *UseCase) RegisterUser(ctx context.Context, reg entity.RegisterRequest) 
 	if err != nil {
 		s.log.Error("RegisterUser: Failed to save refresh token in RegisterUser",
 			zap.String("userID", userID),
-			zap.Error(err),
 		)
 		return "", "", "", entity.ErrSaveRefreshToken
 	}
@@ -199,7 +193,6 @@ func (s *UseCase) RegisterUser(ctx context.Context, reg entity.RegisterRequest) 
 	if err != nil {
 		s.log.Error("RegisterUser: Failed to generate access token in RegisterUser",
 			zap.String("userID", userID),
-			zap.Error(err),
 		)
 		return "", "", "", entity.ErrGenerateAccessToken
 	}
@@ -217,9 +210,8 @@ func (s *UseCase) LoginAccount(ctx context.Context, login, password string) (str
 	if err != nil {
 		s.log.Error("LoginAccount: Failed to compare auth data",
 			zap.String("login", login),
-			zap.Error(err),
 		)
-		return "", "", "", entity.ErrCompareAuthData
+		return "", "", "", err
 	}
 
 	//обновляем токен в redis
@@ -266,9 +258,7 @@ func (s *UseCase) RefreshTokens(ctx context.Context, refreshToken, authHeader st
 	// Get userID from access token
 	userID, err := s.ExtractUserIDFromToken(tokenString, s.cfg.JWTSecret)
 	if err != nil {
-		s.log.Error("RefreshTokens: Invalid access token in RefreshTokens",
-			zap.Error(err),
-		)
+		s.log.Error("RefreshTokens: Invalid access token in RefreshTokens")
 		return "", "", entity.ErrInvalidToken
 	}
 
@@ -298,7 +288,6 @@ func (s *UseCase) RefreshTokens(ctx context.Context, refreshToken, authHeader st
 	if err := s.SaveRefreshToken(ctx, userID, newRefreshToken); err != nil {
 		s.log.Error("RefreshTokens: Failed to save refresh token in RefreshTokens",
 			zap.String("userID", userID),
-			zap.Error(err),
 		)
 		return "", "", entity.ErrSaveRefreshToken
 	}
@@ -312,7 +301,6 @@ func (s *UseCase) RefreshTokens(ctx context.Context, refreshToken, authHeader st
 	if err != nil {
 		s.log.Error("RefreshTokens: Failed to generate access token in RefreshTokens",
 			zap.String("userID", userID),
-			zap.Error(err),
 		)
 		return "", "", entity.ErrGenerateAccessToken
 	}

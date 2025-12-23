@@ -1,9 +1,9 @@
 package UsersClient
 
 import (
+	"AuthService/internal/entity"
 	"context"
 	"encoding/json"
-	"fmt"
 
 	"github.com/go-resty/resty/v2"
 	"go.uber.org/zap"
@@ -39,23 +39,27 @@ func New(client *resty.Client, log *zap.Logger, cfg *ConfigUsersServiceClient) C
 	return &clientService{
 		client:  client,
 		baseUrl: cfg.BaseURL,
-		log:     log.Named("accountServiceClient"),
+		log:     log.Named("AuthClient"),
 	}
 }
 
 // AddUser - добавление пользователя
 func (c *clientService) AddUser(ctx context.Context, userData RegisterRequest) error {
+	var errResp entity.ErrorResponse
+
 	response, err := c.client.R().
 		SetContext(ctx).
 		SetBody(userData).
+		SetError(&errResp).
 		Post(c.baseUrl + addUser)
 
 	if err != nil {
-		return fmt.Errorf("AddUser: %w", err)
+		c.log.Error("Error adding user", zap.Error(err))
+		return entity.ErrInternalServer
 	}
 
 	if response.IsError() {
-		return fmt.Errorf("AddUser: %s", response.Body())
+		return errResp
 	}
 
 	return nil
@@ -63,22 +67,27 @@ func (c *clientService) AddUser(ctx context.Context, userData RegisterRequest) e
 
 // CompareAuthData - сравнение данных для входа
 func (c *clientService) CompareAuthData(ctx context.Context, userData AuthRequest) (string, error) {
-	var authResponse AuthResponse
+	var errResp entity.ErrorResponse
+
 	response, err := c.client.R().
 		SetContext(ctx).
 		SetBody(userData).
+		SetError(&errResp).
 		Post(c.baseUrl + compareAuthData)
 
 	if err != nil {
-		return "", fmt.Errorf("CompareAuthData: %w", err)
+		c.log.Error("Error comparing auth data", zap.Error(err))
+		return "", entity.ErrInternalServer
 	}
 
 	if response.IsError() {
-		return "", fmt.Errorf("CompareAuthData: %s", response.Body())
+		return "", errResp
 	}
 
+	var authResponse AuthResponse
 	if err := json.Unmarshal(response.Body(), &authResponse); err != nil {
-		return "", fmt.Errorf("CompareAuthData: failed to parse response: %w", err)
+		c.log.Error("Error unmarshalling AuthResponse", zap.Error(err))
+		return "", entity.ErrCannotParseClaims
 	}
 
 	return authResponse.ID, nil
@@ -86,18 +95,26 @@ func (c *clientService) CompareAuthData(ctx context.Context, userData AuthReques
 
 // GetRefreshToken  - получаем refresh токен
 func (c *clientService) GetRefreshToken(ctx context.Context, token TokenRequest) (string, error) {
-	var tokenResponse TokenResponse
-	response, err := c.client.R().SetContext(ctx).SetBody(token).Post(c.baseUrl + getRefreshToken)
+	var errResp entity.ErrorResponse
+
+	response, err := c.client.R().
+		SetContext(ctx).
+		SetBody(token).
+		SetError(&errResp).
+		Post(c.baseUrl + getRefreshToken)
+
 	if err != nil {
-		return "", fmt.Errorf("GetRefreshToken: %w", err)
+		return "", entity.ErrInternalServer
 	}
 
 	if response.IsError() {
-		return "", fmt.Errorf("GetRefreshToken: %s", response.Body())
+		return "", errResp
 	}
 
+	var tokenResponse TokenResponse
 	if err := json.Unmarshal(response.Body(), &tokenResponse); err != nil {
-		return "", fmt.Errorf("GetRefreshToken: failed to parse response: %w", err)
+		c.log.Error("Error unmarshalling TokenResponse", zap.Error(err))
+		return "", entity.ErrCannotParseClaims
 	}
 
 	return tokenResponse.RefreshToken, nil
@@ -105,12 +122,21 @@ func (c *clientService) GetRefreshToken(ctx context.Context, token TokenRequest)
 
 // UpdateRefreshToken - обновляем токен
 func (c *clientService) UpdateRefreshToken(ctx context.Context, req UpdateRefreshTokenRequest) error {
-	response, err := c.client.R().SetContext(ctx).SetBody(req).Post(c.baseUrl + updateRefreshToken)
+	var errResp entity.ErrorResponse
+
+	response, err := c.client.R().
+		SetContext(ctx).
+		SetBody(req).
+		SetError(&errResp).
+		Post(c.baseUrl + updateRefreshToken)
+
 	if err != nil {
-		return fmt.Errorf("UpdateRefreshToken: %w", err)
+		c.log.Error("Error updating refresh token", zap.Error(err))
+		return entity.ErrInternalServer
 	}
+
 	if response.IsError() {
-		return fmt.Errorf("UpdateRefreshToken: %s", response.Body())
+		return errResp
 	}
 
 	return nil

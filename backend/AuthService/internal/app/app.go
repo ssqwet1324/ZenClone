@@ -4,6 +4,7 @@ import (
 	"AuthService/internal/client/UsersClient"
 	"AuthService/internal/config"
 	"AuthService/internal/handler"
+	"AuthService/internal/middleware"
 	"AuthService/internal/repository/redis"
 	"AuthService/internal/usecase"
 
@@ -15,15 +16,16 @@ import (
 func Run() {
 	server := gin.Default()
 
-	logger, err := zap.NewDevelopment()
-	if err != nil {
-		panic("Error initializing logger: " + err.Error())
-	}
-
 	cfg, err := config.New()
 	if err != nil {
-		logger.Fatal("Error initializing config", zap.Error(err))
+		panic("ErrorDetail loading config" + err.Error())
 	}
+
+	logger, err := middleware.InitLogger(cfg.LogLevel)
+	if err != nil {
+		panic("ErrorDetail init logger: " + err.Error())
+	}
+	defer logger.Sync()
 
 	restyClient := resty.New()
 
@@ -43,6 +45,6 @@ func Run() {
 	}
 
 	if err := server.Run(":8080"); err != nil {
-		logger.Fatal("Error starting usecase", zap.Error(err))
+		logger.Fatal("ErrorDetail starting usecase", zap.Error(err))
 	}
 }

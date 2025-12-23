@@ -13,6 +13,7 @@ type Config struct {
 	JWTSecret    string `env:"JWT_SECRET"`
 	RedisConfig  redis.Config
 	ClientConfig UsersClient.ConfigUsersServiceClient
+	LogLevel     string `env:"LOG_LEVEL"`
 }
 
 // New - конструктор кфг
