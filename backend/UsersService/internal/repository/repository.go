@@ -13,30 +13,46 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
 const (
-	defaultAvatar = "defaultFoto/default.jpg"
+	defaultAvatar         = "defaultFoto/default.jpg"
+	maxConnectionsFomPgx  = 20
+	minConnectionsFromPgx = 5
 )
 
 // PostgresRepository - структура хранилищ
 type PostgresRepository struct {
-	db     *pgx.Conn
+	db     *pgxpool.Pool
 	client *minio.Client
 	config *config.Config
 }
 
 // Init - инициализация repository
 func Init(ctx context.Context, cfg *config.Config) (*PostgresRepository, error) {
-	conn, err := pgx.Connect(ctx, cfg.CreateDsn())
+	poolCfg, err := pgxpool.ParseConfig(cfg.CreateDsn())
 	if err != nil {
-		return nil, fmt.Errorf("PostgresRepository: Error connecting to PostService: %v", err)
+		return nil, fmt.Errorf("parse db config error: %w", err)
 	}
 
-	sqlDb := stdlib.OpenDB(*conn.Config())
+	poolCfg.MaxConns = maxConnectionsFomPgx
+	poolCfg.MinConns = minConnectionsFromPgx
+
+	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
+	if err != nil {
+		return nil, fmt.Errorf("db connection error: %w", err)
+	}
+
+	// проверка соединения
+	if err := pool.Ping(ctx); err != nil {
+		return nil, fmt.Errorf("db ping error: %w", err)
+	}
+
+	sqlDb := stdlib.OpenDB(*pool.Config().ConnConfig)
 	defer sqlDb.Close()
 
 	driver, err := postgres.WithInstance(sqlDb, &postgres.Config{})
@@ -67,10 +83,15 @@ func Init(ctx context.Context, cfg *config.Config) (*PostgresRepository, error) 
 	}
 
 	return &PostgresRepository{
-		db:     conn,
+		db:     pool,
 		client: minioClient,
 		config: cfg,
 	}, nil
+}
+
+// Close - закрытие бд
+func (repo *PostgresRepository) Close() {
+	repo.db.Close()
 }
 
 // AddUser - добавить пользователя в Бд
@@ -122,7 +143,8 @@ func (repo *PostgresRepository) GetLoginByUserID(ctx context.Context, id uuid.UU
 func (repo *PostgresRepository) GetUserInfoByLogin(ctx context.Context, login string) (*entity.LoginResponse, error) {
 	var userInfo entity.LoginResponse
 
-	err := repo.db.QueryRow(ctx, `SELECT id, password FROM Users WHERE login = $1`, login).Scan(&userInfo.ID, &userInfo.Password)
+	err := repo.db.QueryRow(ctx, `SELECT id, password FROM Users WHERE login = $1`, login).
+		Scan(&userInfo.ID, &userInfo.Password)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, fmt.Errorf("GetUserInfo: User not found")
 	}

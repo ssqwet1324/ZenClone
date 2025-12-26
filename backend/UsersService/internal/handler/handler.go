@@ -165,7 +165,7 @@ func (h *UsersHandler) CompareAuthPassword(ctx *gin.Context) {
 		if errors.Is(err, entity.ErrIncorrectPassword) {
 			ctx.JSON(http.StatusUnauthorized, entity.ErrorResponse{
 				Error: entity.ErrorDetail{
-					Code:    "INCORRECT_PASSWORD",
+					Code:    "INCORRECT_PASSWORD_OR_LOGIN",
 					Message: entity.ErrIncorrectPassword.Error(),
 				},
 			})
@@ -213,7 +213,7 @@ func (h *UsersHandler) AddUser(ctx *gin.Context) {
 
 	if err := h.uc.AddUser(ctx.Request.Context(), req); err != nil {
 		if errors.Is(err, entity.ErrUserAlreadyExists) {
-			ctx.JSON(http.StatusBadRequest, entity.ErrorResponse{
+			ctx.JSON(http.StatusConflict, entity.ErrorResponse{
 				Error: entity.ErrorDetail{
 					Code:    "USER_ALREADY_EXISTS",
 					Message: entity.ErrUserAlreadyExists.Error(),

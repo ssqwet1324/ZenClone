@@ -152,7 +152,7 @@ type UploadAvatarResponse struct {
 var (
 	// Ошибки авторизации
 	ErrUserNotFound      = errors.New("user not found")
-	ErrIncorrectPassword = errors.New("incorrect password")
+	ErrIncorrectPassword = errors.New("incorrect password or login")
 
 	// Ошибки при работе с пользователем
 	ErrUserAlreadyExists     = errors.New("user with this login already exists")

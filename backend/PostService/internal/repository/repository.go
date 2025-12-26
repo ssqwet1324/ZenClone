@@ -15,24 +15,42 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 	"go.uber.org/zap"
 )
 
+const (
+	maxConnectionsFomPgx  = 20
+	minConnectionsFromPgx = 5
+)
+
 type PostgresRepository struct {
-	db  *pgx.Conn
+	db  *pgxpool.Pool
 	log *zap.Logger
 	cfg *config.Config
 }
 
 // Init - инициализация repository
 func Init(ctx context.Context, cfg *config.Config, log *zap.Logger) (*PostgresRepository, error) {
-	conn, err := pgx.Connect(ctx, cfg.CreateDsn())
+	poolCfg, err := pgxpool.ParseConfig(cfg.CreateDsn())
 	if err != nil {
-		return nil, fmt.Errorf("PostgresRepository: Error connecting to PostService: %v", err)
+		return nil, fmt.Errorf("parse db config error: %w", err)
 	}
 
-	sqlDb := stdlib.OpenDB(*conn.Config())
+	poolCfg.MaxConns = maxConnectionsFomPgx
+	poolCfg.MinConns = minConnectionsFromPgx
+
+	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
+	if err != nil {
+		return nil, fmt.Errorf("db connection error: %w", err)
+	}
+
+	// проверка соединения
+	if err := pool.Ping(ctx); err != nil {
+		return nil, fmt.Errorf("db ping error: %w", err)
+	}
+	sqlDb := stdlib.OpenDB(*pool.Config().ConnConfig)
 	defer func(sqlDb *sql.DB) {
 		err := sqlDb.Close()
 		if err != nil {
@@ -61,19 +79,15 @@ func Init(ctx context.Context, cfg *config.Config, log *zap.Logger) (*PostgresRe
 	log.Info("Migration initialized successfully")
 
 	return &PostgresRepository{
-		db:  conn,
+		db:  pool,
 		log: log.Named("Repository"),
 		cfg: cfg,
 	}, nil
 }
 
 // Close - закрытие бд
-func (repo *PostgresRepository) Close(ctx context.Context) {
-	if err := repo.db.Close(ctx); err != nil {
-		repo.log.Warn("PostgresRepository: Error closing PostService", zap.Error(err))
-	}
-
-	repo.log.Info("db closed")
+func (repo *PostgresRepository) Close() {
+	repo.db.Close()
 }
 
 // CreatePost - создать пост

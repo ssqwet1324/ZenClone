@@ -32,6 +32,7 @@ func Run() {
 	if err != nil {
 		logger.Fatal("failed to init postgres repo", zap.Error(err))
 	}
+	defer repo.Close()
 
 	producer := kafka.New([]string{cfg.KafkaAddr}, cfg.KafkaTopic)
 

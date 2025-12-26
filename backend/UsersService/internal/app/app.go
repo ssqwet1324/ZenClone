@@ -31,6 +31,7 @@ func Run() {
 	if err != nil {
 		logger.Fatal("can't initialize repository", zap.Error(err))
 	}
+	defer repo.Close()
 
 	usersService := usecase.New(repo, cfg, logger)
 

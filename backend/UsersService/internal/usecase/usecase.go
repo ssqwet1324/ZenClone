@@ -10,22 +10,42 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// RepositoryProvider - функции repository
-type RepositoryProvider interface {
+// UserRepo - описывает функции для пользователей
+type UserRepo interface {
 	AddUser(ctx context.Context, addUserInfo entity.AddUserRequest) error
 	GetUserInfoByLogin(ctx context.Context, login string) (*entity.LoginResponse, error)
-	GetLoginByUserID(ctx context.Context, id uuid.UUID) (string, error)
-	UpdateRefreshToken(ctx context.Context, id uuid.UUID, refreshToken string) error
-	GetRefreshTokenByUserID(ctx context.Context, id uuid.UUID) (*entity.RefreshTokenResponse, error)
 	GetUserProfileByUsername(ctx context.Context, username string) (*entity.ProfileUserInfoResponse, error)
 	UpdateUserProfile(ctx context.Context, id uuid.UUID, updateProfileInfo entity.UpdateUserProfileInfoRequest) error
 	GetUserIdByUsername(ctx context.Context, username string) (*entity.UserResponse, error)
-	SubscribeFromUser(ctx context.Context, followerID, followingID uuid.UUID) error
-	GetSubsUser(ctx context.Context, userID uuid.UUID) (*entity.SubsList, error)
-	UnsubscribeFromUser(ctx context.Context, followerID, followingID uuid.UUID) error
-	UploadAvatar(ctx context.Context, userID uuid.UUID, bucketName string, avatarInfo entity.AvatarRequest) error
-	GetAvatarURL(ctx context.Context, bucketName string, userID uuid.UUID) (string, error)
 	CheckUser(ctx context.Context, username string) (bool, error)
+	GetLoginByUserID(ctx context.Context, id uuid.UUID) (string, error)
+}
+
+// TokenRepo - описывает функции взаимодействия с токенами
+type TokenRepo interface {
+	UpdateRefreshToken(ctx context.Context, id uuid.UUID, refreshToken string) error
+	GetRefreshTokenByUserID(ctx context.Context, id uuid.UUID) (*entity.RefreshTokenResponse, error)
+}
+
+// SubscriptionRepo - описывает функции для взаимодейтсвия с подписками
+type SubscriptionRepo interface {
+	SubscribeFromUser(ctx context.Context, followerID, followingID uuid.UUID) error
+	UnsubscribeFromUser(ctx context.Context, followerID, followingID uuid.UUID) error
+	GetSubsUser(ctx context.Context, userID uuid.UUID) (*entity.SubsList, error)
+}
+
+// AvatarStorage - описывает функции хранения аватарок пользователекй
+type AvatarStorage interface {
+	GetAvatarURL(ctx context.Context, bucketName string, userID uuid.UUID) (string, error)
+	UploadAvatar(ctx context.Context, userID uuid.UUID, bucketName string, avatarInfo entity.AvatarRequest) error
+}
+
+// RepositoryProvider - описывает все функции repository
+type RepositoryProvider interface {
+	UserRepo
+	TokenRepo
+	SubscriptionRepo
+	AvatarStorage
 }
 
 // UserService - структура бизнес логики
@@ -85,6 +105,7 @@ func (s *UserService) CompareAuthData(ctx context.Context, users entity.AuthRequ
 	return &compareData, nil
 }
 
+// GetRefreshToken - получить refresh токен пользователя
 func (s *UserService) GetRefreshToken(ctx context.Context, id uuid.UUID) (*entity.TokenResponse, error) {
 	var tokenResponse entity.TokenResponse
 

@@ -97,7 +97,6 @@ services:
       - app-network
     restart: always
 
-
   auth_service:
     build:
       context: AuthService
