@@ -1,9 +1,17 @@
 // Посты
 
-// Загрузка постов пользователя
-async function loadUserPosts(username) {
-    console.log('loadUserPosts вызвана:', { username, isOwnProfile: state.isOwnProfile, userId: state.userId });
+// Загрузка постов пользователя (первая загрузка или перезагрузка)
+async function loadUserPosts(username, reset = true) {
+    console.log('loadUserPosts вызвана:', { username, isOwnProfile: state.isOwnProfile, userId: state.userId, reset });
     const postsList = document.getElementById('postsList');
+    
+    // Сбрасываем состояние пагинации при первой загрузке
+    if (reset) {
+        state.postsNextCursor = null;
+        state.postsHasMore = true;
+        state.postsLoading = false;
+        state.currentPostsUserId = null;
+    }
     
     // Для загрузки постов нужен userID
     // Если это профиль текущего пользователя, используем сохраненный ID
@@ -28,30 +36,66 @@ async function loadUserPosts(username) {
         }
         
         if (!userId) {
-            postsList.innerHTML = '<div class="empty-state"><h3>Посты недоступны</h3><p>Для просмотра постов этого пользователя нужно быть на него подписанным</p></div>';
+            if (reset) {
+                postsList.innerHTML = '<div class="empty-state"><h3>Посты недоступны</h3><p>Для просмотра постов этого пользователя нужно быть на него подписанным</p></div>';
+            }
             return;
         }
     }
 
     if (!userId) {
-        postsList.innerHTML = '<div class="empty-state"><h3>Нет постов</h3><p>Не удалось загрузить посты</p></div>';
+        if (reset) {
+            postsList.innerHTML = '<div class="empty-state"><h3>Нет постов</h3><p>Не удалось загрузить посты</p></div>';
+        }
         return;
     }
 
+    // Проверяем, не идет ли уже загрузка
+    if (state.postsLoading) {
+        console.log('Загрузка постов уже идет, пропускаем');
+        return;
+    }
+
+    // Проверяем, есть ли еще посты для загрузки
+    if (!reset && !state.postsHasMore) {
+        console.log('Больше нет постов для загрузки');
+        return;
+    }
+
+    // Проверяем, что это тот же пользователь (при прокрутке)
+    if (!reset && state.currentPostsUserId && state.currentPostsUserId !== userId) {
+        console.log('Загрузка постов другого пользователя, сбрасываем состояние');
+        state.postsNextCursor = null;
+        state.postsHasMore = true;
+    }
+
+    state.currentPostsUserId = userId;
+    state.postsLoading = true;
+
     try {
-        console.log('Запрашиваем посты для userId:', userId);
-        const data = await apiRequest(`/api/v1/posts/by-user/${userId}`);
+        // Формируем URL с query параметрами
+        const limit = 20;
+        const urlParams = new URLSearchParams();
+        urlParams.set('limit', limit.toString());
+        if (state.postsNextCursor) {
+            urlParams.set('cursor', state.postsNextCursor);
+        }
+        const url = `/api/v1/posts/by-user/${userId}?${urlParams.toString()}`;
+
+        console.log('Запрашиваем посты для userId:', userId, 'cursor:', state.postsNextCursor, 'url:', url);
+        const data = await apiRequest(url);
 
         console.log('Получены посты:', data);
         console.log('isOwnProfile при отображении:', state.isOwnProfile);
         console.log('Количество постов:', data.data?.posts?.length || 0);
         
-        if (data.data && data.data.posts && data.data.posts.length > 0) {
+        const posts = data.data?.posts || [];
+        
+        if (posts.length > 0) {
             const isOwn = state.isOwnProfile;
-            console.log('Отображаем посты, isOwn:', isOwn, 'state.isOwnProfile:', state.isOwnProfile);
-            console.log('username:', username, 'state.username:', state.username);
+            console.log('Отображаем посты, isOwn:', isOwn);
             
-            const postsHTML = data.data.posts.map(post => {
+            const postsHTML = posts.map(post => {
                 const actions = isOwn ? `
                     <div class="post-actions">
                         <button class="btn btn-secondary btn-small edit-post-btn" 
@@ -66,81 +110,111 @@ async function loadUserPosts(username) {
                         </button>
                     </div>
                 ` : '';
-                console.log('Пост:', post.id, 'actions:', actions ? 'есть' : 'нет');
                 return `
                 <div class="post-card" data-post-id="${post.id}">
                     <h3>${escapeHtml(post.title)}</h3>
                     <p>${escapeHtml(post.content)}</p>
                     <div class="post-meta">
-                        <span>📅 ${new Date(post.created_at).toLocaleDateString('ru-RU')}</span>
+                        <span>📅 ${new Date(post.created_at).toLocaleString('ru-RU', { 
+                            year: 'numeric', 
+                            month: '2-digit', 
+                            day: '2-digit', 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                        })}</span>
                         ${post.updated_at && post.updated_at !== post.created_at ? 
-                            `<span>✏️ Обновлено: ${new Date(post.updated_at).toLocaleDateString('ru-RU')}</span>` : ''}
+                            `<span>✏️ Обновлено: ${new Date(post.updated_at).toLocaleString('ru-RU', { 
+                                year: 'numeric', 
+                                month: '2-digit', 
+                                day: '2-digit', 
+                                hour: '2-digit', 
+                                minute: '2-digit' 
+                            })}</span>` : ''}
                     </div>
                     ${actions}
                 </div>
             `;
             }).join('');
             
-            console.log('HTML постов сгенерирован, длина:', postsHTML.length);
-            console.log('HTML содержит post-actions:', postsHTML.includes('post-actions'));
-            postsList.innerHTML = postsHTML;
-
-            // Проверяем что кнопки действительно в DOM
-            setTimeout(() => {
-                const testActions = postsList.querySelectorAll('.post-actions');
-                console.log('Проверка после вставки: найдено .post-actions:', testActions.length);
-                if (testActions.length > 0) {
-                    console.log('Первая кнопка действий:', testActions[0].innerHTML.substring(0, 100));
-                    const editBtns = testActions[0].querySelectorAll('.edit-post-btn');
-                    const deleteBtns = testActions[0].querySelectorAll('.delete-post-btn');
-                    console.log('В первой карточке найдено кнопок редактирования:', editBtns.length);
-                    console.log('В первой карточке найдено кнопок удаления:', deleteBtns.length);
-                } else {
-                    console.error('КРИТИЧЕСКАЯ ОШИБКА: .post-actions не найдены в DOM!');
-                    console.log('Первые 500 символов HTML:', postsList.innerHTML.substring(0, 500));
-                }
-            }, 100);
-
-            // Добавляем обработчики для кнопок редактирования и удаления
-            if (isOwn) {
-                console.log('Добавляем обработчики для кнопок редактирования/удаления, isOwn:', isOwn);
-                const editButtons = postsList.querySelectorAll('.edit-post-btn');
-                const deleteButtons = postsList.querySelectorAll('.delete-post-btn');
-                console.log('Найдено кнопок редактирования:', editButtons.length);
-                console.log('Найдено кнопок удаления:', deleteButtons.length);
-                
-                if (editButtons.length === 0 && deleteButtons.length === 0) {
-                    console.error('КРИТИЧЕСКАЯ ОШИБКА: Кнопки не найдены в DOM!');
-                    console.log('Содержимое postsList:', postsList.innerHTML.substring(0, 500));
-                }
-                
-                editButtons.forEach(btn => {
-                    btn.addEventListener('click', (e) => {
-                        const postId = e.target.closest('.edit-post-btn').dataset.postId;
-                        const title = e.target.closest('.edit-post-btn').dataset.postTitle;
-                        const content = e.target.closest('.edit-post-btn').dataset.postContent;
-                        console.log('Клик на редактирование поста:', { postId, title, content });
-                        showEditPostModal(postId, title, content);
-                    });
-                });
-
-                deleteButtons.forEach(btn => {
-                    btn.addEventListener('click', (e) => {
-                        const postId = e.target.closest('.delete-post-btn').dataset.postId;
-                        console.log('Клик на удаление поста:', postId);
-                        handleDeletePost(postId);
-                    });
-                });
+            // Добавляем посты к существующим или заменяем их
+            if (reset) {
+                postsList.innerHTML = postsHTML;
             } else {
-                console.log('Кнопки редактирования/удаления не добавляются (не свой профиль)');
+                // Удаляем индикатор загрузки, если он есть
+                const loadingIndicator = postsList.querySelector('.posts-loading');
+                if (loadingIndicator) {
+                    loadingIndicator.remove();
+                }
+                postsList.insertAdjacentHTML('beforeend', postsHTML);
+            }
+
+            // Обновляем состояние пагинации
+            state.postsNextCursor = data.data?.next_cursor || data.data?.nextCursor || null;
+            state.postsHasMore = !!state.postsNextCursor && state.postsNextCursor !== '';
+
+            // Обработчики для кнопок редактирования и удаления уже настроены через делегирование в app.js
+            // Здесь ничего не делаем
+
+            // Если есть еще посты, удаляем индикатор "конец списка"
+            const endIndicator = postsList.querySelector('.posts-end');
+            if (endIndicator) {
+                endIndicator.remove();
             }
         } else {
-            postsList.innerHTML = '<div class="empty-state"><h3>Нет постов</h3><p>У этого пользователя пока нет публикаций</p></div>';
+            // Нет постов
+            if (reset) {
+                postsList.innerHTML = '<div class="empty-state"><h3>Нет постов</h3><p>У этого пользователя пока нет публикаций</p></div>';
+            } else {
+                // Удаляем индикатор загрузки
+                const loadingIndicator = postsList.querySelector('.posts-loading');
+                if (loadingIndicator) {
+                    loadingIndicator.remove();
+                }
+                // Добавляем индикатор конца списка
+                if (!postsList.querySelector('.posts-end')) {
+                    postsList.insertAdjacentHTML('beforeend', '<div class="posts-end empty-state"><p>Больше нет постов</p></div>');
+                }
+            }
+            state.postsHasMore = false;
         }
     } catch (error) {
         console.error('Ошибка загрузки постов:', error);
-        postsList.innerHTML = '<div class="empty-state"><h3>Ошибка загрузки постов</h3><p>' + escapeHtml(error.message) + '</p></div>';
+        
+        // Если это 404 при первой загрузке - это нормально (нет постов)
+        // Если это ошибка при прокрутке - просто останавливаем загрузку
+        if (reset) {
+            if (error.message && (error.message.includes('404') || error.message.includes('POSTS_NOT_FOUND'))) {
+                postsList.innerHTML = '<div class="empty-state"><h3>Нет постов</h3><p>У этого пользователя пока нет публикаций</p></div>';
+            } else {
+                postsList.innerHTML = '<div class="empty-state"><h3>Ошибка загрузки постов</h3><p>' + escapeHtml(error.message) + '</p></div>';
+            }
+        } else {
+            // Удаляем индикатор загрузки при ошибке
+            const loadingIndicator = postsList.querySelector('.posts-loading');
+            if (loadingIndicator) {
+                loadingIndicator.remove();
+            }
+            state.postsHasMore = false;
+        }
+    } finally {
+        state.postsLoading = false;
     }
+}
+
+// Загрузка следующих постов (для прокрутки)
+async function loadMoreUserPosts(username) {
+    if (state.postsLoading || !state.postsHasMore) {
+        return;
+    }
+    
+    const postsList = document.getElementById('postsList');
+    
+    // Добавляем индикатор загрузки
+    if (!postsList.querySelector('.posts-loading')) {
+        postsList.insertAdjacentHTML('beforeend', '<div class="posts-loading empty-state"><p>Загрузка постов...</p></div>');
+    }
+    
+    await loadUserPosts(username, false);
 }
 
 // Показать модальное окно создания поста

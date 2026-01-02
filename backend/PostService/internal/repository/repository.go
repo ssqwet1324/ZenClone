@@ -187,33 +187,51 @@ func (repo *PostgresRepository) DeletePost(ctx context.Context, postID uuid.UUID
 }
 
 // GetPostsUser - получить посты пользователя
-func (repo *PostgresRepository) GetPostsUser(ctx context.Context, authorID uuid.UUID) (*entity.PostListResponse, error) {
+func (repo *PostgresRepository) GetPostsUser(ctx context.Context, authorID uuid.UUID, limit int, cursor *entity.PostCursor) (*entity.PostListResponse, error) {
 	var postList entity.PostListResponse
+	var rows pgx.Rows
+	var err error
 
-	rows, err := repo.db.Query(ctx, `SELECT post_id, title, content, created_at, updated_at FROM Posts WHERE author_id = $1`, authorID)
+	// делаем сначала обынчный запрос на limit, далее уже с cursor
+	if cursor == nil {
+		rows, err = repo.db.Query(ctx, `SELECT post_id, title, content, created_at, updated_at FROM posts
+            WHERE author_id = $1 ORDER BY created_at DESC, post_id DESC LIMIT $2`, authorID, limit)
+	} else {
+		rows, err = repo.db.Query(ctx, `SELECT post_id, title, content, created_at, updated_at FROM posts
+            WHERE author_id = $1 AND (created_at < $2 OR (created_at = $2 AND post_id < $3))
+            ORDER BY created_at DESC, post_id DESC LIMIT $4`, authorID, cursor.CreatedAt, cursor.ID, limit)
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("GetPostsUser: error getting posts: %v", err)
 	}
-
 	defer rows.Close()
 
 	for rows.Next() {
 		var post entity.PostResponse
-		err = rows.Scan(
+		if err := rows.Scan(
 			&post.ID,
 			&post.Title,
 			&post.Content,
 			&post.CreatedAt,
 			&post.UpdatedAt,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("GetPostsUser: error scanning posts: %v", err)
+		); err != nil {
+			return nil, fmt.Errorf("GetPostsUser: scan error: %w", err)
 		}
-
 		postList.Posts = append(postList.Posts, post)
 	}
 
-	repo.log.Info("GetPostsUser: successful getting posts", zap.String("author_id", authorID.String()))
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("GetPostsUser: error iterating rows: %v", err)
+	}
+
+	if len(postList.Posts) > 0 {
+		last := postList.Posts[len(postList.Posts)-1]
+		postList.NextCursor = &entity.PostCursor{
+			CreatedAt: last.CreatedAt,
+			ID:        last.ID,
+		}
+	}
 
 	return &postList, nil
 }

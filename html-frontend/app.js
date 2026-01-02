@@ -176,6 +176,40 @@ function initEventListeners() {
             });
         }
 
+        // Infinite scroll для постов
+        let scrollTimeout;
+        let isScrolling = false;
+        window.addEventListener('scroll', () => {
+            // Throttle для производительности
+            if (isScrolling) return;
+            isScrolling = true;
+            
+            clearTimeout(scrollTimeout);
+            scrollTimeout = setTimeout(() => {
+                const profileContainer = document.getElementById('profileContainer');
+                const postsTab = document.getElementById('postsTab');
+                
+                // Проверяем, что мы на странице профиля и видим вкладку постов
+                if (profileContainer && profileContainer.style.display !== 'none' && 
+                    postsTab && postsTab.classList.contains('active')) {
+                    
+                    // Получаем текущий username из state.currentProfile
+                    if (state.currentProfile && state.currentProfile.username) {
+                        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+                        const windowHeight = window.innerHeight;
+                        const documentHeight = document.documentElement.scrollHeight;
+                        
+                        // Загружаем следующие посты, если осталось меньше 300px до конца
+                        if (documentHeight - (scrollTop + windowHeight) < 300) {
+                            loadMoreUserPosts(state.currentProfile.username);
+                        }
+                    }
+                }
+                
+                isScrolling = false;
+            }, 100);
+        });
+
         // Закрытие модальных окон по клику вне их
         window.addEventListener('click', (e) => {
             const authModal = document.getElementById('authModal');

@@ -16,7 +16,7 @@ type RepositoryProvider interface {
 	CreatePost(ctx context.Context, createPost entity.CreatePostResponse) (*entity.CreatePostResponse, error)
 	UpdatePost(ctx context.Context, postID uuid.UUID, authorID uuid.UUID, updateReq entity.UpdateUserPostRequest) (*entity.UpdateUserPostResponse, error)
 	DeletePost(ctx context.Context, postID uuid.UUID, userID uuid.UUID) error
-	GetPostsUser(ctx context.Context, authorID uuid.UUID) (*entity.PostListResponse, error)
+	GetPostsUser(ctx context.Context, authorID uuid.UUID, limit int, cursor *entity.PostCursor) (*entity.PostListResponse, error)
 }
 
 // PostUseCase - структура бизнес логики
@@ -133,8 +133,8 @@ func (s *PostUseCase) DeletePost(ctx context.Context, postID uuid.UUID, userID u
 }
 
 // GetPostsUser - получаем посты пользователя
-func (s *PostUseCase) GetPostsUser(ctx context.Context, authorID uuid.UUID) (*entity.PostListResponse, error) {
-	rows, err := s.repo.GetPostsUser(ctx, authorID)
+func (s *PostUseCase) GetPostsUser(ctx context.Context, authorID uuid.UUID, limit int, cursor *entity.PostCursor) (*entity.PostListResponse, error) {
+	rows, err := s.repo.GetPostsUser(ctx, authorID, limit, cursor)
 	if err != nil {
 		s.log.Error("GetPostsUser: error getting posts from repository",
 			zap.String("author_id", authorID.String()),
@@ -145,7 +145,7 @@ func (s *PostUseCase) GetPostsUser(ctx context.Context, authorID uuid.UUID) (*en
 	if len(rows.Posts) == 0 {
 		s.log.Warn("GetPostsUser: posts not found",
 			zap.String("author_id", authorID.String()))
-		return &entity.PostListResponse{}, entity.ErrPostsNotFound
+		return nil, entity.ErrPostsNotFound
 	}
 
 	return rows, nil

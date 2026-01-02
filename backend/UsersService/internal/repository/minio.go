@@ -55,5 +55,6 @@ func (repo *PostgresRepository) GetAvatarURL(ctx context.Context, bucketName str
 	}
 
 	avatarURL := fmt.Sprintf("%s/%s/%s", publicEndpoint, bucketName, objectName)
+
 	return avatarURL, nil
 }

@@ -18,3 +18,5 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     FOREIGN KEY (follower_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (following_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
+CREATE INDEX idx_subscriptions_following ON subscriptions(following_id);

@@ -41,7 +41,14 @@ type PostResponse struct {
 }
 
 type PostListResponse struct {
-	Posts []PostResponse `json:"posts"`
+	Posts      []PostResponse `json:"posts"`
+	NextCursor *PostCursor    `json:"next_cursor"`
+}
+
+// PostCursor используется для бесконечной ленты постов в профиле
+type PostCursor struct {
+	CreatedAt time.Time `json:"created_at"`
+	ID        uuid.UUID `json:"id"`
 }
 
 // CreatePostResponseData - данные ответа при создании поста
@@ -83,8 +90,9 @@ type DeletePostSuccessResponse struct {
 
 // GetPostsUserResponseData - данные ответа при получении постов
 type GetPostsUserResponseData struct {
-	Posts []PostResponse `json:"posts"`
-	Count int            `json:"count"`
+	Posts      []PostResponse `json:"posts"`
+	Count      int            `json:"count"`
+	NextCursor string         `json:"next_cursor"`
 }
 
 // GetPostsUserSuccessResponse - успешный ответ при получении постов

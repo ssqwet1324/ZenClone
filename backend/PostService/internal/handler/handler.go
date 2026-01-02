@@ -4,7 +4,11 @@ import (
 	"PostService/internal/entity"
 	"PostService/internal/usecase"
 	"errors"
+	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -290,13 +294,15 @@ func (h *PostHandler) DeletePost(ctx *gin.Context) {
 }
 
 // GetPostsUser godoc
-// @Summary Получение постов пользователя
-// @Description Возвращает список всех постов указанного пользователя
+// @Summary Получение постов пользователя с пагинацией
+// @Description Возвращает список постов указанного пользователя с поддержкой cursor-based pagination.
 // @Tags posts
 // @Produce json
 // @Param userID path string true "ID пользователя"
-// @Success 200 {object} entity.GetPostsUserSuccessResponse "Список постов получен"
-// @Failure 400 {object} entity.ErrorResponse "Некорректный userID"
+// @Param limit query int false "Количество постов за один запрос (по умолчанию 20, максимум 50)"
+// @Param cursor query string false "Cursor для следующей страницы, формат: created_at|post_id"
+// @Success 200 {object} entity.GetPostsUserSuccessResponse "Список постов успешно получен"
+// @Failure 400 {object} entity.ErrorResponse "Некорректный userID или limit"
 // @Failure 404 {object} entity.ErrorResponse "Посты пользователя не найдены"
 // @Failure 500 {object} entity.ErrorResponse "Внутренняя ошибка сервера"
 // @Router /api/v1/posts/by-user/{userID} [get]
@@ -313,7 +319,46 @@ func (h *PostHandler) GetPostsUser(ctx *gin.Context) {
 		return
 	}
 
-	data, err := h.uc.GetPostsUser(ctx.Request.Context(), userUUID)
+	limit := ctx.Query("limit")
+	constLimit := 20
+	if limit != "" {
+		parsedLimit, err := strconv.Atoi(limit)
+		if err != nil {
+			h.log.Warn("GetPostsUser: invalid limit format", zap.String("limit", limit))
+			ctx.JSON(http.StatusBadRequest, entity.ErrorResponse{
+				Error: entity.ErrorDetail{
+					Code:    "INVALID_REQUEST",
+					Message: "invalid limit format",
+				},
+			})
+			return
+		}
+		constLimit = parsedLimit
+		// Ограничиваем максимальный лимит
+		if constLimit > 50 {
+			constLimit = 50
+		}
+	}
+
+	// формируем параметр для частичной отдачи постов
+	var cursor *entity.PostCursor
+	if cur := ctx.Query("cursor"); cur != "" {
+		parts := strings.Split(cur, "|")
+		if len(parts) == 2 {
+			t, err := time.Parse(time.RFC3339, parts[0])
+			if err == nil {
+				id, err := uuid.Parse(parts[1])
+				if err == nil {
+					cursor = &entity.PostCursor{
+						CreatedAt: t,
+						ID:        id,
+					}
+				}
+			}
+		}
+	}
+
+	data, err := h.uc.GetPostsUser(ctx.Request.Context(), userUUID, constLimit, cursor)
 	if err != nil {
 		if errors.Is(err, entity.ErrPostsNotFound) {
 			ctx.JSON(http.StatusNotFound, entity.ErrorResponse{
@@ -334,11 +379,21 @@ func (h *PostHandler) GetPostsUser(ctx *gin.Context) {
 		return
 	}
 
+	// показыаем с какого поста загружать следующие
+	var nextCursor string
+	if data.NextCursor != nil {
+		nextCursor = fmt.Sprintf("%s|%s",
+			data.NextCursor.CreatedAt.Format(time.RFC3339),
+			data.NextCursor.ID.String(),
+		)
+	}
+
 	ctx.JSON(http.StatusOK, entity.GetPostsUserSuccessResponse{
 		Message: "Posts retrieved successfully",
 		Data: entity.GetPostsUserResponseData{
-			Posts: data.Posts,
-			Count: len(data.Posts),
+			Posts:      data.Posts,
+			Count:      len(data.Posts),
+			NextCursor: nextCursor,
 		},
 	})
 }

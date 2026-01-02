@@ -6,6 +6,11 @@ const state = {
     accessToken: null,
     refreshToken: null,
     username: null,
-    userId: null
+    userId: null,
+    // Пагинация постов
+    postsNextCursor: null,
+    postsLoading: false,
+    postsHasMore: true,
+    currentPostsUserId: null
 };
 

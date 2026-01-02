@@ -6,3 +6,7 @@ CREATE TABLE IF NOT EXISTS posts (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
+
+CREATE INDEX idx_posts_author_created_id
+    ON posts (author_id, created_at DESC, post_id DESC);
+
