@@ -20,6 +20,8 @@ definitions:
         type: string
       refresh_token:
         type: string
+      username:
+        type: string
     type: object
   entity.LoginUserInfo:
     properties:
@@ -58,6 +60,8 @@ definitions:
         type: string
       refresh_token:
         type: string
+      username:
+        type: string
     type: object
   entity.TokenRequest:
     properties:
@@ -77,10 +81,10 @@ paths:
     post:
       consumes:
       - application/json
-      description: Аутентификация пользователя по логину и паролю, возвращает access
-        и refresh токены
+      description: Выполняет вход пользователя по логину и паролю и возвращает access
+        и refresh JWT токены
       parameters:
-      - description: Данные для входа
+      - description: Логин и пароль пользователя
         in: body
         name: input
         required: true
@@ -90,11 +94,11 @@ paths:
       - application/json
       responses:
         "200":
-          description: Успешный вход, выданы токены
+          description: Аутентификация прошла успешно
           schema:
             $ref: '#/definitions/entity.LoginResponse'
         "400":
-          description: Некорректный запрос
+          description: Некорректное тело запроса
           schema:
             $ref: '#/definitions/entity.ErrorResponse'
         "401":
@@ -105,23 +109,23 @@ paths:
           description: Внутренняя ошибка сервера
           schema:
             $ref: '#/definitions/entity.ErrorResponse'
-      summary: Вход в систему
+      summary: Аутентификация пользователя
       tags:
       - auth
   /api/v1/auth/refresh:
     post:
       consumes:
       - application/json
-      description: Обновляет access и refresh токены по текущему access токену и refresh
-        токену
+      description: Обновляет access и refresh токены по валидному refresh токену и
+        access токену из заголовка Authorization
       parameters:
-      - default: Bearer
-        description: Bearer токен (текущий access token)
+      - description: Bearer access token
+        example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
         in: header
         name: Authorization
         required: true
         type: string
-      - description: Данные для обновления токенов
+      - description: Refresh токен
         in: body
         name: input
         required: true
@@ -135,27 +139,28 @@ paths:
           schema:
             $ref: '#/definitions/entity.RefreshResponse'
         "400":
-          description: Некорректный запрос или отсутствует заголовок Authorization
+          description: Отсутствует refresh token или заголовок Authorization
           schema:
             $ref: '#/definitions/entity.ErrorResponse'
         "401":
-          description: Невалидный/просроченный токен или refresh token не найден
+          description: Токен невалиден или истёк срок действия
           schema:
             $ref: '#/definitions/entity.ErrorResponse'
         "500":
           description: Внутренняя ошибка сервера
           schema:
             $ref: '#/definitions/entity.ErrorResponse'
-      summary: Обновление access и refresh токенов
+      summary: Обновление JWT токенов
       tags:
       - auth
   /api/v1/auth/register:
     post:
       consumes:
       - application/json
-      description: Создаёт нового пользователя и возвращает access и refresh токены
+      description: Регистрирует нового пользователя, создаёт учётную запись и возвращает
+        access и refresh JWT токены
       parameters:
-      - description: Данные для регистрации
+      - description: Данные для регистрации пользователя
         in: body
         name: input
         required: true
@@ -169,7 +174,11 @@ paths:
           schema:
             $ref: '#/definitions/entity.RegisterResponse'
         "400":
-          description: Некорректный запрос
+          description: Некорректное тело запроса
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "409":
+          description: Пользователь с таким логином уже существует
           schema:
             $ref: '#/definitions/entity.ErrorResponse'
         "500":

@@ -31,13 +31,14 @@ func New(service *usecase.UseCase, logger *zap.Logger, cfg *config.Config, clien
 
 // Register godoc
 // @Summary Регистрация пользователя
-// @Description Создаёт нового пользователя и возвращает access и refresh токены
+// @Description Регистрирует нового пользователя, создаёт учётную запись и возвращает access и refresh JWT токены
 // @Tags auth
 // @Accept json
 // @Produce json
-// @Param input body entity.RegisterRequest true "Данные для регистрации"
+// @Param input body entity.RegisterRequest true "Данные для регистрации пользователя"
 // @Success 201 {object} entity.RegisterResponse "Пользователь успешно зарегистрирован"
-// @Failure 400 {object} entity.ErrorResponse "Некорректный запрос"
+// @Failure 400 {object} entity.ErrorResponse "Некорректное тело запроса"
+// @Failure 409 {object} entity.ErrorResponse "Пользователь с таким логином уже существует"
 // @Failure 500 {object} entity.ErrorResponse "Внутренняя ошибка сервера"
 // @Router /api/v1/auth/register [post]
 func (h *AuthHandler) Register(ctx *gin.Context) {
@@ -64,20 +65,21 @@ func (h *AuthHandler) Register(ctx *gin.Context) {
 		ID:           userID,
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
+		Username:     user.Username,
 	})
 }
 
 // Refresh godoc
-// @Summary Обновление access и refresh токенов
-// @Description Обновляет access и refresh токены по текущему access токену и refresh токену
+// @Summary Обновление JWT токенов
+// @Description Обновляет access и refresh токены по валидному refresh токену и access токену из заголовка Authorization
 // @Tags auth
 // @Accept json
 // @Produce json
-// @Param Authorization header string true "Bearer токен (текущий access token)" example(Bearer eyJhbGciOi...)
-// @Param input body entity.TokenRequest true "Данные для обновления токенов"
+// @Param Authorization header string true "Bearer access token" example(Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...)
+// @Param input body entity.TokenRequest true "Refresh токен"
 // @Success 200 {object} entity.RefreshResponse "Токены успешно обновлены"
-// @Failure 400 {object} entity.ErrorResponse "Некорректный запрос или отсутствует заголовок Authorization"
-// @Failure 401 {object} entity.ErrorResponse "Невалидный/просроченный токен или refresh token не найден"
+// @Failure 400 {object} entity.ErrorResponse "Отсутствует refresh token или заголовок Authorization"
+// @Failure 401 {object} entity.ErrorResponse "Токен невалиден или истёк срок действия"
 // @Failure 500 {object} entity.ErrorResponse "Внутренняя ошибка сервера"
 // @Router /api/v1/auth/refresh [post]
 func (h *AuthHandler) Refresh(ctx *gin.Context) {
@@ -128,14 +130,14 @@ func (h *AuthHandler) Refresh(ctx *gin.Context) {
 }
 
 // Login godoc
-// @Summary Вход в систему
-// @Description Аутентификация пользователя по логину и паролю, возвращает access и refresh токены
+// @Summary Аутентификация пользователя
+// @Description Выполняет вход пользователя по логину и паролю и возвращает access и refresh JWT токены
 // @Tags auth
 // @Accept json
 // @Produce json
-// @Param input body entity.LoginUserInfo true "Данные для входа"
-// @Success 200 {object} entity.LoginResponse "Успешный вход, выданы токены"
-// @Failure 400 {object} entity.ErrorResponse "Некорректный запрос"
+// @Param input body entity.LoginUserInfo true "Логин и пароль пользователя"
+// @Success 200 {object} entity.LoginResponse "Аутентификация прошла успешно"
+// @Failure 400 {object} entity.ErrorResponse "Некорректное тело запроса"
 // @Failure 401 {object} entity.ErrorResponse "Неверный логин или пароль"
 // @Failure 500 {object} entity.ErrorResponse "Внутренняя ошибка сервера"
 // @Router /api/v1/auth/login [post]
@@ -152,15 +154,11 @@ func (h *AuthHandler) Login(ctx *gin.Context) {
 		return
 	}
 
-	userID, accessToken, refreshToken, err := h.uc.LoginAccount(ctx, user.Login, user.Password)
+	login, err := h.uc.LoginAccount(ctx, user.Login, user.Password)
 	if err != nil {
 		h.handleError(ctx, err)
 		return
 	}
 
-	ctx.JSON(http.StatusOK, entity.LoginResponse{
-		ID:           userID,
-		RefreshToken: refreshToken,
-		AccessToken:  accessToken,
-	})
+	ctx.JSON(http.StatusOK, login)
 }

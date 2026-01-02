@@ -16,6 +16,8 @@ import (
 func Run() {
 	server := gin.Default()
 
+	server.Use(middleware.ServerMiddleware())
+
 	logger, err := zap.NewDevelopment()
 	if err != nil {
 		panic("Error creating zap logger: " + err.Error())

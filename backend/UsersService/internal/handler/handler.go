@@ -12,7 +12,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// максимальный размер аватарки
+// Максимальный размер аватарки
 const maxAvatarSize = 50 * 1024 * 1024
 
 type UsersHandler struct {
@@ -25,6 +25,26 @@ func New(uc *usecase.UserService, log *zap.Logger) *UsersHandler {
 		uc:  uc,
 		log: log.Named("UsersHandler"),
 	}
+}
+
+// getUserIDFromJWTToken - получить из jwt токена id пользователя
+func getUserIDFromJWTToken(ctx *gin.Context) (uuid.UUID, error) {
+	userIDRaw, exists := ctx.Get("userID")
+	if !exists {
+		return uuid.Nil, errors.New("userID not found in context")
+	}
+
+	userIDStr, ok := userIDRaw.(string)
+	if !ok {
+		return uuid.Nil, errors.New("userID has wrong type")
+	}
+
+	userUUID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return uuid.Nil, errors.New("invalid userID format")
+	}
+
+	return userUUID, nil
 }
 
 // UpdateRefreshToken godoc
@@ -182,7 +202,8 @@ func (h *UsersHandler) CompareAuthPassword(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, entity.CompareAuthPasswordResponse{
-		ID: data.ID.String(),
+		ID:       data.ID.String(),
+		Username: data.Username,
 	})
 }
 
@@ -240,21 +261,67 @@ func (h *UsersHandler) AddUser(ctx *gin.Context) {
 // @Summary Получение профиля пользователя
 // @Description Получает информацию о профиле пользователя по username
 // @Tags users
-// @Accept json
+// @Security BearerAuth
 // @Produce json
 // @Param username path string true "Username пользователя"
 // @Success 200 {object} entity.ProfileUserInfoResponse "Профиль пользователя"
+// @Failure 401 {object} entity.ErrorResponse "Неавторизован"
+// @Failure 404 {object} entity.ErrorResponse "Пользователь не найден"
 // @Failure 500 {object} entity.ErrorResponse "Внутренняя ошибка сервера"
 // @Router /api/v1/get-user-profile/{username} [get]
 func (h *UsersHandler) GetProfile(ctx *gin.Context) {
+	yourUserJWTID, err := getUserIDFromJWTToken(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusUnauthorized, entity.ErrorResponse{
+			Error: entity.ErrorDetail{
+				Code:    "UNAUTHORIZED",
+				Message: err.Error(),
+			},
+		})
+		return
+	}
+
 	username := ctx.Param("username")
 
-	data, err := h.uc.GetUserProfileByUsername(ctx, username)
+	userID, err := h.uc.GetUserIDByUsername(ctx, username)
+	if err != nil {
+		if errors.Is(err, entity.ErrUserNotFound) {
+			ctx.JSON(http.StatusNotFound, entity.ErrorResponse{
+				Error: entity.ErrorDetail{
+					Code:    "USER_NOT_FOUND",
+					Message: entity.ErrUserNotFound.Error(),
+				},
+			})
+			return
+		}
+
+		ctx.JSON(http.StatusInternalServerError, entity.ErrorResponse{
+			Error: entity.ErrorDetail{
+				Code:    "INTERNAL_ERROR",
+				Message: entity.ErrInternalServer.Error(),
+			},
+		})
+		return
+	}
+
+	otherValidUserID, err := uuid.Parse(userID)
+	if err != nil {
+		h.log.Warn("GetProfile: invalid userID format", zap.String("userID", userID), zap.Error(err))
+		ctx.JSON(http.StatusBadRequest, entity.ErrorResponse{
+			Error: entity.ErrorDetail{
+				Code:    "USER_NOT_FOUND",
+				Message: "invalid userID format",
+			},
+		})
+		return
+	}
+
+	data, err := h.uc.GetUserProfileByID(ctx, yourUserJWTID, otherValidUserID)
 	if err != nil {
 		if errors.Is(err, entity.ErrFailedToGetUserInfo) {
-			ctx.JSON(http.StatusInternalServerError, entity.ErrorResponse{
+			ctx.JSON(http.StatusNotFound, entity.ErrorResponse{
 				Error: entity.ErrorDetail{
-					Code:    "FAILED_TO_GET_USER_INFO",
+					Code:    "USER_NOT_FOUND",
 					Message: entity.ErrFailedToGetUserInfo.Error(),
 				},
 			})
@@ -287,13 +354,13 @@ func (h *UsersHandler) GetProfile(ctx *gin.Context) {
 // @Summary Обновление профиля пользователя
 // @Description Обновляет информацию профиля текущего пользователя
 // @Tags users
+// @Security BearerAuth
 // @Accept json
 // @Produce json
-// @Param Authorization header string true "Bearer токен" default(Bearer )
 // @Param input body entity.UpdateUserProfileInfoRequest true "Данные для обновления профиля"
-// @Success 200 {object} entity.UpdateUserProfileInfoResponse "Профиль успешно обновлен"
+// @Success 200 {object} entity.UpdateUserProfileInfoResponse "Профиль успешно обновлён"
 // @Failure 400 {object} entity.ErrorResponse "Некорректный запрос"
-// @Failure 401 {object} entity.ErrorResponse "Неавторизован или неверный пароль"
+// @Failure 401 {object} entity.ErrorResponse "Неверный пароль или неавторизован"
 // @Failure 500 {object} entity.ErrorResponse "Внутренняя ошибка сервера"
 // @Router /api/v1/update-user-info [post]
 func (h *UsersHandler) UpdateProfile(ctx *gin.Context) {
@@ -387,24 +454,35 @@ func (h *UsersHandler) UpdateProfile(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, data)
 }
 
-// GetUserIDByUsername godoc
-// @Summary Получение ID пользователя по username
-// @Description Получает ID пользователя по его username
+// Subscribe godoc
+// @Summary Подписка на пользователя
+// @Description Подписывает текущего пользователя на другого пользователя
 // @Tags users
-// @Accept json
+// @Security BearerAuth
 // @Produce json
 // @Param username path string true "Username пользователя"
-// @Success 200 {object} entity.UserResponse "ID пользователя"
+// @Success 200 {object} entity.SubscribeResponse "Успешная подписка"
+// @Failure 401 {object} entity.ErrorResponse "Неавторизован"
 // @Failure 404 {object} entity.ErrorResponse "Пользователь не найден"
 // @Failure 500 {object} entity.ErrorResponse "Внутренняя ошибка сервера"
-// @Router /api/v1/user/{username} [get]
-func (h *UsersHandler) GetUserIDByUsername(ctx *gin.Context) {
-	username := ctx.Param("username")
+// @Router /api/v1/user/subscribe/{username} [post]
+func (h *UsersHandler) Subscribe(ctx *gin.Context) {
+	followerID, err := getUserIDFromJWTToken(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusUnauthorized, entity.ErrorResponse{
+			Error: entity.ErrorDetail{
+				Code:    "UNAUTHORIZED",
+				Message: err.Error(),
+			},
+		})
+		return
+	}
 
-	data, err := h.uc.GetUserIDByUsername(ctx.Request.Context(), username)
+	username := ctx.Param("username")
+	userID, err := h.uc.GetUserIDByUsername(ctx, username)
 	if err != nil {
 		if errors.Is(err, entity.ErrUserNotFound) {
-			ctx.JSON(http.StatusNotFound, entity.ErrorResponse{
+			ctx.JSON(http.StatusUnauthorized, entity.ErrorResponse{
 				Error: entity.ErrorDetail{
 					Code:    "USER_NOT_FOUND",
 					Message: entity.ErrUserNotFound.Error(),
@@ -422,51 +500,10 @@ func (h *UsersHandler) GetUserIDByUsername(ctx *gin.Context) {
 		return
 	}
 
-	h.log.Info("GetUserIDByUsername: success", zap.String("userID", data.ID.String()))
-	ctx.JSON(http.StatusOK, data)
-}
-
-// Subscribe godoc
-// @Summary Подписка на пользователя
-// @Description Подписывает текущего пользователя на другого пользователя
-// @Tags users
-// @Accept json
-// @Produce json
-// @Param Authorization header string true "Bearer токен" default(Bearer )
-// @Param username path string true "Username пользователя для подписки"
-// @Success 200 {object} entity.SubscribeResponse "Успешная подписка"
-// @Failure 400 {object} entity.ErrorResponse "Некорректный запрос"
-// @Failure 401 {object} entity.ErrorResponse "Неавторизован"
-// @Failure 404 {object} entity.ErrorResponse "Пользователь не найден"
-// @Failure 500 {object} entity.ErrorResponse "Внутренняя ошибка сервера"
-// @Router /api/v1/user/subscribe/{username} [post]
-func (h *UsersHandler) Subscribe(ctx *gin.Context) {
-	userIDRaw, exists := ctx.Get("userID")
-	if !exists {
-		ctx.AbortWithStatusJSON(http.StatusUnauthorized, entity.ErrorResponse{
-			Error: entity.ErrorDetail{
-				Code:    "UNAUTHORIZED",
-				Message: "userID not found in context",
-			},
-		})
-		return
-	}
-
-	userIDStr, ok := userIDRaw.(string)
-	if !ok {
-		ctx.AbortWithStatusJSON(http.StatusUnauthorized, entity.ErrorResponse{
-			Error: entity.ErrorDetail{
-				Code:    "UNAUTHORIZED",
-				Message: "userID has wrong type",
-			},
-		})
-		return
-	}
-
-	userUUID, err := uuid.Parse(userIDStr)
+	followingID, err := uuid.Parse(userID)
 	if err != nil {
-		h.log.Warn("Subscribe: invalid userID format", zap.String("userID", userIDStr), zap.Error(err))
-		ctx.AbortWithStatusJSON(http.StatusBadRequest, entity.ErrorResponse{
+		h.log.Warn("Subscribe: invalid userID format", zap.String("userID", followingID.String()), zap.Error(err))
+		ctx.JSON(http.StatusBadRequest, entity.ErrorResponse{
 			Error: entity.ErrorDetail{
 				Code:    "INVALID_REQUEST",
 				Message: "invalid userID format",
@@ -475,9 +512,7 @@ func (h *UsersHandler) Subscribe(ctx *gin.Context) {
 		return
 	}
 
-	username := ctx.Param("username")
-
-	err = h.uc.SubscribeToUser(ctx, userUUID, username)
+	err = h.uc.SubscribeToUser(ctx, followerID, followingID)
 	if err != nil {
 		if errors.Is(err, entity.ErrUserNotFound) {
 			ctx.JSON(http.StatusNotFound, entity.ErrorResponse{
@@ -515,19 +550,62 @@ func (h *UsersHandler) Subscribe(ctx *gin.Context) {
 
 // GetSubsUser godoc
 // @Summary Получение списка подписок пользователя
-// @Description Получает список пользователей, на которых подписан указанный пользователь
+// @Description Получает список пользователей, на которых подписан пользователь
 // @Tags users
-// @Accept json
+// @Security BearerAuth
 // @Produce json
 // @Param username path string true "Username пользователя"
 // @Success 200 {object} entity.SubsList "Список подписок"
-// @Failure 404 {object} entity.ErrorResponse "Пользователь не найден или нет подписок"
+// @Failure 401 {object} entity.ErrorResponse "Неавторизован"
+// @Failure 404 {object} entity.ErrorResponse "Подписки не найдены"
 // @Failure 500 {object} entity.ErrorResponse "Внутренняя ошибка сервера"
 // @Router /api/v1/user/subs/{username} [get]
 func (h *UsersHandler) GetSubsUser(ctx *gin.Context) {
+	if _, err := getUserIDFromJWTToken(ctx); err != nil {
+		ctx.JSON(http.StatusUnauthorized, entity.ErrorResponse{
+			Error: entity.ErrorDetail{
+				Code:    "UNAUTHORIZED",
+				Message: err.Error(),
+			},
+		})
+		return
+	}
+
 	username := ctx.Param("username")
 
-	data, err := h.uc.GetSubsUser(ctx, username)
+	userID, err := h.uc.GetUserIDByUsername(ctx, username)
+	if err != nil {
+		if errors.Is(err, entity.ErrUserNotFound) {
+			ctx.JSON(http.StatusNotFound, entity.ErrorResponse{
+				Error: entity.ErrorDetail{
+					Code:    "USER_NOT_FOUND",
+					Message: entity.ErrUserNotFound.Error(),
+				},
+			})
+			return
+		}
+		ctx.JSON(http.StatusInternalServerError, entity.ErrorResponse{
+			Error: entity.ErrorDetail{
+				Code:    "INTERNAL_ERROR",
+				Message: entity.ErrInternalServer.Error(),
+			},
+		})
+		return
+	}
+
+	validUserID, err := uuid.Parse(userID)
+	if err != nil {
+		h.log.Warn("GetSubsUser: invalid userID format", zap.String("userID", userID), zap.Error(err))
+		ctx.JSON(http.StatusBadRequest, entity.ErrorResponse{
+			Error: entity.ErrorDetail{
+				Code:    "INVALID_REQUEST",
+				Message: "invalid userID format",
+			},
+		})
+		return
+	}
+
+	data, err := h.uc.GetSubsUser(ctx, validUserID)
 	if err != nil {
 		if errors.Is(err, entity.ErrUserNotFound) {
 			ctx.JSON(http.StatusNotFound, entity.ErrorResponse{
@@ -575,42 +653,51 @@ func (h *UsersHandler) GetSubsUser(ctx *gin.Context) {
 // @Summary Отписка от пользователя
 // @Description Отписывает текущего пользователя от другого пользователя
 // @Tags users
-// @Accept json
+// @Security BearerAuth
 // @Produce json
-// @Param Authorization header string true "Bearer токен" default(Bearer )
-// @Param username path string true "Username пользователя для отписки"
+// @Param username path string true "Username пользователя"
 // @Success 200 {object} entity.UnsubscribeResponse "Успешная отписка"
-// @Failure 400 {object} entity.ErrorResponse "Некорректный запрос"
 // @Failure 401 {object} entity.ErrorResponse "Неавторизован"
 // @Failure 404 {object} entity.ErrorResponse "Пользователь не найден"
 // @Failure 500 {object} entity.ErrorResponse "Внутренняя ошибка сервера"
 // @Router /api/v1/user/unsubscribe/{username} [post]
 func (h *UsersHandler) UnsubscribeFromUser(ctx *gin.Context) {
-	userIDRaw, exists := ctx.Get("userID")
-	if !exists {
-		ctx.AbortWithStatusJSON(http.StatusUnauthorized, entity.ErrorResponse{
-			Error: entity.ErrorDetail{
-				Code:    "UNAUTHORIZED",
-				Message: "userID not found in context",
-			},
-		})
-		return
-	}
-
-	userIDStr, ok := userIDRaw.(string)
-	if !ok {
-		ctx.AbortWithStatusJSON(http.StatusUnauthorized, entity.ErrorResponse{
-			Error: entity.ErrorDetail{
-				Code:    "UNAUTHORIZED",
-				Message: "userID has wrong type",
-			},
-		})
-		return
-	}
-
-	userUUID, err := uuid.Parse(userIDStr)
+	followerID, err := getUserIDFromJWTToken(ctx)
 	if err != nil {
-		ctx.AbortWithStatusJSON(http.StatusBadRequest, entity.ErrorResponse{
+		ctx.JSON(http.StatusUnauthorized, entity.ErrorResponse{
+			Error: entity.ErrorDetail{
+				Code:    "UNAUTHORIZED",
+				Message: err.Error(),
+			},
+		})
+		return
+	}
+
+	username := ctx.Param("username")
+	userID, err := h.uc.GetUserIDByUsername(ctx, username)
+	if err != nil {
+		if errors.Is(err, entity.ErrUserNotFound) {
+			ctx.JSON(http.StatusNotFound, entity.ErrorResponse{
+				Error: entity.ErrorDetail{
+					Code:    "USER_NOT_FOUND",
+					Message: entity.ErrUserNotFound.Error(),
+				},
+			})
+		}
+
+		ctx.JSON(http.StatusInternalServerError, entity.ErrorResponse{
+			Error: entity.ErrorDetail{
+				Code:    "INTERNAL_ERROR",
+				Message: entity.ErrInternalServer.Error(),
+			},
+		})
+		return
+	}
+
+	followingID, err := uuid.Parse(userID)
+	if err != nil {
+		h.log.Warn("UnsubscribeFromUser: invalid userID format", zap.String("userID", followingID.String()), zap.Error(err))
+		ctx.JSON(http.StatusBadRequest, entity.ErrorResponse{
 			Error: entity.ErrorDetail{
 				Code:    "INVALID_REQUEST",
 				Message: "invalid userID format",
@@ -619,9 +706,7 @@ func (h *UsersHandler) UnsubscribeFromUser(ctx *gin.Context) {
 		return
 	}
 
-	username := ctx.Param("username")
-
-	err = h.uc.UnsubscribeFromUser(ctx, userUUID, username)
+	err = h.uc.UnsubscribeFromUser(ctx, followerID, followingID)
 	if err != nil {
 		if errors.Is(err, entity.ErrUserNotFound) {
 			ctx.JSON(http.StatusNotFound, entity.ErrorResponse{
@@ -661,12 +746,12 @@ func (h *UsersHandler) UnsubscribeFromUser(ctx *gin.Context) {
 // @Summary Загрузка аватара пользователя
 // @Description Загружает аватар для текущего пользователя
 // @Tags users
+// @Security BearerAuth
 // @Accept multipart/form-data
 // @Produce json
-// @Param Authorization header string true "Bearer токен" default(Bearer )
-// @Param avatar formData file true "Файл аватара (максимум 50MB)"
+// @Param avatar formData file true "Файл аватара (до 50MB)"
 // @Success 200 {object} entity.UploadAvatarResponse "Аватар успешно загружен"
-// @Failure 400 {object} entity.ErrorResponse "Некорректный запрос или файл слишком большой"
+// @Failure 400 {object} entity.ErrorResponse "Некорректный файл"
 // @Failure 401 {object} entity.ErrorResponse "Неавторизован"
 // @Failure 500 {object} entity.ErrorResponse "Внутренняя ошибка сервера"
 // @Router /api/v1/user/upload-avatar [post]

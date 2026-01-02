@@ -201,8 +201,8 @@ func (s *UseCase) RegisterUser(ctx context.Context, reg entity.RegisterRequest) 
 }
 
 // LoginAccount - входим в аккаунт и отдаем новые токены
-func (s *UseCase) LoginAccount(ctx context.Context, login, password string) (string, string, string, error) {
-	userID, err := s.client.CompareAuthData(ctx, UsersClient.AuthRequest{
+func (s *UseCase) LoginAccount(ctx context.Context, login, password string) (*entity.LoginResponse, error) {
+	response, err := s.client.CompareAuthData(ctx, UsersClient.AuthRequest{
 		Login:    login,
 		Password: password,
 	})
@@ -211,38 +211,50 @@ func (s *UseCase) LoginAccount(ctx context.Context, login, password string) (str
 		s.log.Error("LoginAccount: Failed to compare auth data",
 			zap.String("login", login),
 		)
-		return "", "", "", err
+		return nil, err
 	}
 
 	//обновляем токен в redis
-	newRefreshToken, err := s.UpdateRefreshToken(ctx, userID)
+	newRefreshToken, err := s.UpdateRefreshToken(ctx, response.ID)
 	if err != nil {
 		s.log.Error("LoginAccount: Failed to update refresh token in LoginAccount",
-			zap.String("userID", userID),
+			zap.String("userID", response.ID),
 			zap.Error(err),
 		)
-		return "", "", "", entity.ErrUpdateRefreshToken
+		return nil, entity.ErrUpdateRefreshToken
 	}
 
 	//обновляем токен в redis
-	newAccessToken, err := s.GenerateAccessToken(userID, s.cfg.JWTSecret)
+	newAccessToken, err := s.GenerateAccessToken(response.ID, s.cfg.JWTSecret)
 	if err != nil {
 		s.log.Error("LoginAccount: Failed to generate access token in LoginAccount",
-			zap.String("userID", userID),
+			zap.String("userID", response.ID),
 			zap.Error(err),
 		)
-		return "", "", "", entity.ErrGenerateAccessToken
+		return nil, entity.ErrGenerateAccessToken
 	}
 
 	// обновляем токен через клиента UpdateRefreshToken
 	var token UsersClient.UpdateRefreshTokenRequest
 
-	token.ID = userID
+	token.ID = response.ID
 	token.RefreshToken = newRefreshToken
 
 	err = s.client.UpdateRefreshToken(ctx, token)
+	if err != nil {
+		s.log.Error("LoginAccount: Failed to update refresh token in LoginAccount",
+			zap.String("userID", response.ID),
+			zap.Error(err))
+		return nil, entity.ErrUpdateRefreshToken
+	}
 
-	return userID, newAccessToken, newRefreshToken, nil
+	var LoginResponse entity.LoginResponse
+	LoginResponse.ID = response.ID
+	LoginResponse.Username = response.Username
+	LoginResponse.AccessToken = newAccessToken
+	LoginResponse.RefreshToken = newRefreshToken
+
+	return &LoginResponse, nil
 }
 
 // RefreshTokens - Отдаем новые токены

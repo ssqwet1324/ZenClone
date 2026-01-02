@@ -33,6 +33,8 @@ definitions:
     properties:
       id:
         type: string
+      username:
+        type: string
     type: object
   entity.ErrorDetail:
     properties:
@@ -52,6 +54,8 @@ definitions:
         type: string
       first_name:
         type: string
+      is_subscribed:
+        type: boolean
       last_name:
         type: string
       user_avatar_url:
@@ -140,11 +144,6 @@ definitions:
       message:
         type: string
     type: object
-  entity.UserResponse:
-    properties:
-      id:
-        type: string
-    type: object
 host: localhost:8081
 info:
   contact: {}
@@ -154,8 +153,6 @@ info:
 paths:
   /api/v1/get-user-profile/{username}:
     get:
-      consumes:
-      - application/json
       description: Получает информацию о профиле пользователя по username
       parameters:
       - description: Username пользователя
@@ -170,10 +167,20 @@ paths:
           description: Профиль пользователя
           schema:
             $ref: '#/definitions/entity.ProfileUserInfoResponse'
+        "401":
+          description: Неавторизован
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "404":
+          description: Пользователь не найден
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
         "500":
           description: Внутренняя ошибка сервера
           schema:
             $ref: '#/definitions/entity.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: Получение профиля пользователя
       tags:
       - users
@@ -183,12 +190,6 @@ paths:
       - application/json
       description: Обновляет информацию профиля текущего пользователя
       parameters:
-      - default: Bearer
-        description: Bearer токен
-        in: header
-        name: Authorization
-        required: true
-        type: string
       - description: Данные для обновления профиля
         in: body
         name: input
@@ -199,7 +200,7 @@ paths:
       - application/json
       responses:
         "200":
-          description: Профиль успешно обновлен
+          description: Профиль успешно обновлён
           schema:
             $ref: '#/definitions/entity.UpdateUserProfileInfoResponse'
         "400":
@@ -207,50 +208,21 @@ paths:
           schema:
             $ref: '#/definitions/entity.ErrorResponse'
         "401":
-          description: Неавторизован или неверный пароль
+          description: Неверный пароль или неавторизован
           schema:
             $ref: '#/definitions/entity.ErrorResponse'
         "500":
           description: Внутренняя ошибка сервера
           schema:
             $ref: '#/definitions/entity.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: Обновление профиля пользователя
-      tags:
-      - users
-  /api/v1/user/{username}:
-    get:
-      consumes:
-      - application/json
-      description: Получает ID пользователя по его username
-      parameters:
-      - description: Username пользователя
-        in: path
-        name: username
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: ID пользователя
-          schema:
-            $ref: '#/definitions/entity.UserResponse'
-        "404":
-          description: Пользователь не найден
-          schema:
-            $ref: '#/definitions/entity.ErrorResponse'
-        "500":
-          description: Внутренняя ошибка сервера
-          schema:
-            $ref: '#/definitions/entity.ErrorResponse'
-      summary: Получение ID пользователя по username
       tags:
       - users
   /api/v1/user/subs/{username}:
     get:
-      consumes:
-      - application/json
-      description: Получает список пользователей, на которых подписан указанный пользователь
+      description: Получает список пользователей, на которых подписан пользователь
       parameters:
       - description: Username пользователя
         in: path
@@ -264,30 +236,28 @@ paths:
           description: Список подписок
           schema:
             $ref: '#/definitions/entity.SubsList'
+        "401":
+          description: Неавторизован
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
         "404":
-          description: Пользователь не найден или нет подписок
+          description: Подписки не найдены
           schema:
             $ref: '#/definitions/entity.ErrorResponse'
         "500":
           description: Внутренняя ошибка сервера
           schema:
             $ref: '#/definitions/entity.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: Получение списка подписок пользователя
       tags:
       - users
   /api/v1/user/subscribe/{username}:
     post:
-      consumes:
-      - application/json
       description: Подписывает текущего пользователя на другого пользователя
       parameters:
-      - default: Bearer
-        description: Bearer токен
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: Username пользователя для подписки
+      - description: Username пользователя
         in: path
         name: username
         required: true
@@ -299,10 +269,6 @@ paths:
           description: Успешная подписка
           schema:
             $ref: '#/definitions/entity.SubscribeResponse'
-        "400":
-          description: Некорректный запрос
-          schema:
-            $ref: '#/definitions/entity.ErrorResponse'
         "401":
           description: Неавторизован
           schema:
@@ -315,22 +281,16 @@ paths:
           description: Внутренняя ошибка сервера
           schema:
             $ref: '#/definitions/entity.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: Подписка на пользователя
       tags:
       - users
   /api/v1/user/unsubscribe/{username}:
     post:
-      consumes:
-      - application/json
       description: Отписывает текущего пользователя от другого пользователя
       parameters:
-      - default: Bearer
-        description: Bearer токен
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: Username пользователя для отписки
+      - description: Username пользователя
         in: path
         name: username
         required: true
@@ -342,10 +302,6 @@ paths:
           description: Успешная отписка
           schema:
             $ref: '#/definitions/entity.UnsubscribeResponse'
-        "400":
-          description: Некорректный запрос
-          schema:
-            $ref: '#/definitions/entity.ErrorResponse'
         "401":
           description: Неавторизован
           schema:
@@ -358,6 +314,8 @@ paths:
           description: Внутренняя ошибка сервера
           schema:
             $ref: '#/definitions/entity.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: Отписка от пользователя
       tags:
       - users
@@ -367,13 +325,7 @@ paths:
       - multipart/form-data
       description: Загружает аватар для текущего пользователя
       parameters:
-      - default: Bearer
-        description: Bearer токен
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: Файл аватара (максимум 50MB)
+      - description: Файл аватара (до 50MB)
         in: formData
         name: avatar
         required: true
@@ -386,7 +338,7 @@ paths:
           schema:
             $ref: '#/definitions/entity.UploadAvatarResponse'
         "400":
-          description: Некорректный запрос или файл слишком большой
+          description: Некорректный файл
           schema:
             $ref: '#/definitions/entity.ErrorResponse'
         "401":
@@ -397,6 +349,8 @@ paths:
           description: Внутренняя ошибка сервера
           schema:
             $ref: '#/definitions/entity.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: Загрузка аватара пользователя
       tags:
       - users

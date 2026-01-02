@@ -60,15 +60,15 @@ func getUserUUID(ctx *gin.Context) (uuid.UUID, *entity.ErrorResponse) {
 
 // CreatePost godoc
 // @Summary Создание поста
-// @Description Создает новый пост для текущего пользователя
+// @Description Создает новый пост для текущего аутентифицированного пользователя
 // @Tags posts
+// @Security BearerAuth
 // @Accept json
 // @Produce json
-// @Param Authorization header string true "Bearer токен" default(Bearer )
 // @Param input body entity.CreatePostRequest true "Данные для создания поста"
 // @Success 201 {object} entity.CreatePostSuccessResponse "Пост успешно создан"
-// @Failure 400 {object} entity.ErrorResponse "Некорректный запрос или пустые поля"
-// @Failure 401 {object} entity.ErrorResponse "Неавторизован"
+// @Failure 400 {object} entity.ErrorResponse "Некорректное тело запроса или пустые поля"
+// @Failure 401 {object} entity.ErrorResponse "Пользователь не авторизован"
 // @Failure 500 {object} entity.ErrorResponse "Внутренняя ошибка сервера"
 // @Router /api/v1/posts/create [post]
 func (h *PostHandler) CreatePost(ctx *gin.Context) {
@@ -135,16 +135,16 @@ func (h *PostHandler) CreatePost(ctx *gin.Context) {
 
 // UpdatePost godoc
 // @Summary Обновление поста
-// @Description Обновляет существующий пост текущего пользователя
+// @Description Обновляет существующий пост, принадлежащий текущему пользователю
 // @Tags posts
+// @Security BearerAuth
 // @Accept json
 // @Produce json
-// @Param Authorization header string true "Bearer токен" default(Bearer )
-// @Param postID path string true "ID поста для обновления"
+// @Param postID path string true "ID поста"
 // @Param input body entity.UpdateUserPostRequest true "Данные для обновления поста"
-// @Success 200 {object} entity.UpdatePostSuccessResponse "Пост успешно обновлен"
-// @Failure 400 {object} entity.ErrorResponse "Некорректный запрос или пустые поля"
-// @Failure 401 {object} entity.ErrorResponse "Неавторизован"
+// @Success 200 {object} entity.UpdatePostSuccessResponse "Пост успешно обновлён"
+// @Failure 400 {object} entity.ErrorResponse "Некорректный postID или пустые поля"
+// @Failure 401 {object} entity.ErrorResponse "Пользователь не авторизован"
 // @Failure 403 {object} entity.ErrorResponse "Пост не принадлежит пользователю"
 // @Failure 500 {object} entity.ErrorResponse "Внутренняя ошибка сервера"
 // @Router /api/v1/posts/update/{postID} [post]
@@ -230,15 +230,14 @@ func (h *PostHandler) UpdatePost(ctx *gin.Context) {
 
 // DeletePost godoc
 // @Summary Удаление поста
-// @Description Удаляет пост текущего пользователя
+// @Description Удаляет пост, принадлежащий текущему пользователю
 // @Tags posts
-// @Accept json
+// @Security BearerAuth
 // @Produce json
-// @Param Authorization header string true "Bearer токен" default(Bearer )
-// @Param postID path string true "ID поста для удаления"
-// @Success 200 {object} entity.DeletePostSuccessResponse "Пост успешно удален"
-// @Failure 400 {object} entity.ErrorResponse "Некорректный запрос"
-// @Failure 401 {object} entity.ErrorResponse "Неавторизован"
+// @Param postID path string true "ID поста"
+// @Success 200 {object} entity.DeletePostSuccessResponse "Пост успешно удалён"
+// @Failure 400 {object} entity.ErrorResponse "Некорректный postID"
+// @Failure 401 {object} entity.ErrorResponse "Пользователь не авторизован"
 // @Failure 403 {object} entity.ErrorResponse "Пост не принадлежит пользователю"
 // @Failure 500 {object} entity.ErrorResponse "Внутренняя ошибка сервера"
 // @Router /api/v1/posts/delete/{postID} [delete]
@@ -291,15 +290,14 @@ func (h *PostHandler) DeletePost(ctx *gin.Context) {
 }
 
 // GetPostsUser godoc
-// @Summary Получение всех постов пользователя
-// @Description Получает список всех постов указанного пользователя
+// @Summary Получение постов пользователя
+// @Description Возвращает список всех постов указанного пользователя
 // @Tags posts
-// @Accept json
 // @Produce json
 // @Param userID path string true "ID пользователя"
-// @Success 200 {object} entity.GetPostsUserSuccessResponse "Список постов успешно получен"
-// @Failure 400 {object} entity.ErrorResponse "Некорректный запрос"
-// @Failure 404 {object} entity.ErrorResponse "Посты не найдены"
+// @Success 200 {object} entity.GetPostsUserSuccessResponse "Список постов получен"
+// @Failure 400 {object} entity.ErrorResponse "Некорректный userID"
+// @Failure 404 {object} entity.ErrorResponse "Посты пользователя не найдены"
 // @Failure 500 {object} entity.ErrorResponse "Внутренняя ошибка сервера"
 // @Router /api/v1/posts/by-user/{userID} [get]
 func (h *PostHandler) GetPostsUser(ctx *gin.Context) {

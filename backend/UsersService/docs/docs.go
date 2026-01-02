@@ -17,10 +17,12 @@ const docTemplate = `{
     "paths": {
         "/api/v1/get-user-profile/{username}": {
             "get": {
-                "description": "Получает информацию о профиле пользователя по username",
-                "consumes": [
-                    "application/json"
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
                 ],
+                "description": "Получает информацию о профиле пользователя по username",
                 "produces": [
                     "application/json"
                 ],
@@ -44,6 +46,18 @@ const docTemplate = `{
                             "$ref": "#/definitions/entity.ProfileUserInfoResponse"
                         }
                     },
+                    "401": {
+                        "description": "Неавторизован",
+                        "schema": {
+                            "$ref": "#/definitions/entity.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Пользователь не найден",
+                        "schema": {
+                            "$ref": "#/definitions/entity.ErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "Внутренняя ошибка сервера",
                         "schema": {
@@ -55,6 +69,11 @@ const docTemplate = `{
         },
         "/api/v1/update-user-info": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Обновляет информацию профиля текущего пользователя",
                 "consumes": [
                     "application/json"
@@ -68,14 +87,6 @@ const docTemplate = `{
                 "summary": "Обновление профиля пользователя",
                 "parameters": [
                     {
-                        "type": "string",
-                        "default": "Bearer",
-                        "description": "Bearer токен",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
                         "description": "Данные для обновления профиля",
                         "name": "input",
                         "in": "body",
@@ -87,7 +98,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Профиль успешно обновлен",
+                        "description": "Профиль успешно обновлён",
                         "schema": {
                             "$ref": "#/definitions/entity.UpdateUserProfileInfoResponse"
                         }
@@ -99,7 +110,7 @@ const docTemplate = `{
                         }
                     },
                     "401": {
-                        "description": "Неавторизован или неверный пароль",
+                        "description": "Неверный пароль или неавторизован",
                         "schema": {
                             "$ref": "#/definitions/entity.ErrorResponse"
                         }
@@ -115,10 +126,12 @@ const docTemplate = `{
         },
         "/api/v1/user/subs/{username}": {
             "get": {
-                "description": "Получает список пользователей, на которых подписан указанный пользователь",
-                "consumes": [
-                    "application/json"
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
                 ],
+                "description": "Получает список пользователей, на которых подписан пользователь",
                 "produces": [
                     "application/json"
                 ],
@@ -142,8 +155,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/entity.SubsList"
                         }
                     },
+                    "401": {
+                        "description": "Неавторизован",
+                        "schema": {
+                            "$ref": "#/definitions/entity.ErrorResponse"
+                        }
+                    },
                     "404": {
-                        "description": "Пользователь не найден или нет подписок",
+                        "description": "Подписки не найдены",
                         "schema": {
                             "$ref": "#/definitions/entity.ErrorResponse"
                         }
@@ -159,10 +178,12 @@ const docTemplate = `{
         },
         "/api/v1/user/subscribe/{username}": {
             "post": {
-                "description": "Подписывает текущего пользователя на другого пользователя",
-                "consumes": [
-                    "application/json"
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
                 ],
+                "description": "Подписывает текущего пользователя на другого пользователя",
                 "produces": [
                     "application/json"
                 ],
@@ -173,15 +194,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "default": "Bearer",
-                        "description": "Bearer токен",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Username пользователя для подписки",
+                        "description": "Username пользователя",
                         "name": "username",
                         "in": "path",
                         "required": true
@@ -192,12 +205,6 @@ const docTemplate = `{
                         "description": "Успешная подписка",
                         "schema": {
                             "$ref": "#/definitions/entity.SubscribeResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Некорректный запрос",
-                        "schema": {
-                            "$ref": "#/definitions/entity.ErrorResponse"
                         }
                     },
                     "401": {
@@ -223,10 +230,12 @@ const docTemplate = `{
         },
         "/api/v1/user/unsubscribe/{username}": {
             "post": {
-                "description": "Отписывает текущего пользователя от другого пользователя",
-                "consumes": [
-                    "application/json"
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
                 ],
+                "description": "Отписывает текущего пользователя от другого пользователя",
                 "produces": [
                     "application/json"
                 ],
@@ -237,15 +246,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "default": "Bearer",
-                        "description": "Bearer токен",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Username пользователя для отписки",
+                        "description": "Username пользователя",
                         "name": "username",
                         "in": "path",
                         "required": true
@@ -256,12 +257,6 @@ const docTemplate = `{
                         "description": "Успешная отписка",
                         "schema": {
                             "$ref": "#/definitions/entity.UnsubscribeResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Некорректный запрос",
-                        "schema": {
-                            "$ref": "#/definitions/entity.ErrorResponse"
                         }
                     },
                     "401": {
@@ -287,6 +282,11 @@ const docTemplate = `{
         },
         "/api/v1/user/upload-avatar": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Загружает аватар для текущего пользователя",
                 "consumes": [
                     "multipart/form-data"
@@ -300,16 +300,8 @@ const docTemplate = `{
                 "summary": "Загрузка аватара пользователя",
                 "parameters": [
                     {
-                        "type": "string",
-                        "default": "Bearer",
-                        "description": "Bearer токен",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
                         "type": "file",
-                        "description": "Файл аватара (максимум 50MB)",
+                        "description": "Файл аватара (до 50MB)",
                         "name": "avatar",
                         "in": "formData",
                         "required": true
@@ -323,57 +315,13 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Некорректный запрос или файл слишком большой",
+                        "description": "Некорректный файл",
                         "schema": {
                             "$ref": "#/definitions/entity.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Неавторизован",
-                        "schema": {
-                            "$ref": "#/definitions/entity.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Внутренняя ошибка сервера",
-                        "schema": {
-                            "$ref": "#/definitions/entity.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/user/{username}": {
-            "get": {
-                "description": "Получает ID пользователя по его username",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "users"
-                ],
-                "summary": "Получение ID пользователя по username",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Username пользователя",
-                        "name": "username",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "ID пользователя",
-                        "schema": {
-                            "$ref": "#/definitions/entity.UserResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Пользователь не найден",
                         "schema": {
                             "$ref": "#/definitions/entity.ErrorResponse"
                         }
@@ -635,6 +583,9 @@ const docTemplate = `{
             "properties": {
                 "id": {
                     "type": "string"
+                },
+                "username": {
+                    "type": "string"
                 }
             }
         },
@@ -665,6 +616,9 @@ const docTemplate = `{
                 },
                 "first_name": {
                     "type": "string"
+                },
+                "is_subscribed": {
+                    "type": "boolean"
                 },
                 "last_name": {
                     "type": "string"
@@ -800,14 +754,6 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "message": {
-                    "type": "string"
-                }
-            }
-        },
-        "entity.UserResponse": {
-            "type": "object",
-            "properties": {
-                "id": {
                     "type": "string"
                 }
             }

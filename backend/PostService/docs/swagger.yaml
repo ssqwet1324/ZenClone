@@ -110,9 +110,7 @@ info:
 paths:
   /api/v1/posts/by-user/{userID}:
     get:
-      consumes:
-      - application/json
-      description: Получает список всех постов указанного пользователя
+      description: Возвращает список всех постов указанного пользователя
       parameters:
       - description: ID пользователя
         in: path
@@ -123,36 +121,30 @@ paths:
       - application/json
       responses:
         "200":
-          description: Список постов успешно получен
+          description: Список постов получен
           schema:
             $ref: '#/definitions/entity.GetPostsUserSuccessResponse'
         "400":
-          description: Некорректный запрос
+          description: Некорректный userID
           schema:
             $ref: '#/definitions/entity.ErrorResponse'
         "404":
-          description: Посты не найдены
+          description: Посты пользователя не найдены
           schema:
             $ref: '#/definitions/entity.ErrorResponse'
         "500":
           description: Внутренняя ошибка сервера
           schema:
             $ref: '#/definitions/entity.ErrorResponse'
-      summary: Получение всех постов пользователя
+      summary: Получение постов пользователя
       tags:
       - posts
   /api/v1/posts/create:
     post:
       consumes:
       - application/json
-      description: Создает новый пост для текущего пользователя
+      description: Создает новый пост для текущего аутентифицированного пользователя
       parameters:
-      - default: Bearer
-        description: Bearer токен
-        in: header
-        name: Authorization
-        required: true
-        type: string
       - description: Данные для создания поста
         in: body
         name: input
@@ -167,33 +159,27 @@ paths:
           schema:
             $ref: '#/definitions/entity.CreatePostSuccessResponse'
         "400":
-          description: Некорректный запрос или пустые поля
+          description: Некорректное тело запроса или пустые поля
           schema:
             $ref: '#/definitions/entity.ErrorResponse'
         "401":
-          description: Неавторизован
+          description: Пользователь не авторизован
           schema:
             $ref: '#/definitions/entity.ErrorResponse'
         "500":
           description: Внутренняя ошибка сервера
           schema:
             $ref: '#/definitions/entity.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: Создание поста
       tags:
       - posts
   /api/v1/posts/delete/{postID}:
     delete:
-      consumes:
-      - application/json
-      description: Удаляет пост текущего пользователя
+      description: Удаляет пост, принадлежащий текущему пользователю
       parameters:
-      - default: Bearer
-        description: Bearer токен
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: ID поста для удаления
+      - description: ID поста
         in: path
         name: postID
         required: true
@@ -202,15 +188,15 @@ paths:
       - application/json
       responses:
         "200":
-          description: Пост успешно удален
+          description: Пост успешно удалён
           schema:
             $ref: '#/definitions/entity.DeletePostSuccessResponse'
         "400":
-          description: Некорректный запрос
+          description: Некорректный postID
           schema:
             $ref: '#/definitions/entity.ErrorResponse'
         "401":
-          description: Неавторизован
+          description: Пользователь не авторизован
           schema:
             $ref: '#/definitions/entity.ErrorResponse'
         "403":
@@ -221,6 +207,8 @@ paths:
           description: Внутренняя ошибка сервера
           schema:
             $ref: '#/definitions/entity.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: Удаление поста
       tags:
       - posts
@@ -228,15 +216,9 @@ paths:
     post:
       consumes:
       - application/json
-      description: Обновляет существующий пост текущего пользователя
+      description: Обновляет существующий пост, принадлежащий текущему пользователю
       parameters:
-      - default: Bearer
-        description: Bearer токен
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: ID поста для обновления
+      - description: ID поста
         in: path
         name: postID
         required: true
@@ -251,15 +233,15 @@ paths:
       - application/json
       responses:
         "200":
-          description: Пост успешно обновлен
+          description: Пост успешно обновлён
           schema:
             $ref: '#/definitions/entity.UpdatePostSuccessResponse'
         "400":
-          description: Некорректный запрос или пустые поля
+          description: Некорректный postID или пустые поля
           schema:
             $ref: '#/definitions/entity.ErrorResponse'
         "401":
-          description: Неавторизован
+          description: Пользователь не авторизован
           schema:
             $ref: '#/definitions/entity.ErrorResponse'
         "403":
@@ -270,6 +252,8 @@ paths:
           description: Внутренняя ошибка сервера
           schema:
             $ref: '#/definitions/entity.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: Обновление поста
       tags:
       - posts

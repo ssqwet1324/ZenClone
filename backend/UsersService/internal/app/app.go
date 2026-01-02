@@ -15,6 +15,8 @@ import (
 func Run() {
 	server := gin.Default()
 
+	server.Use(middleware.ServerMiddleware())
+
 	logger, err := zap.NewDevelopment()
 	if err != nil {
 		panic("Error creating zap logger: " + err.Error())
@@ -39,9 +41,8 @@ func Run() {
 
 	apiV1 := server.Group("/api/v1")
 	{
-		apiV1.GET("/get-user-profile/:username", userHandler.GetProfile)
-		apiV1.GET("/user/:username", userHandler.GetUserIDByUsername)
-		apiV1.GET("/user/subs/:username", userHandler.GetSubsUser)
+		apiV1.GET("/get-user-profile/:username", userMiddleware, userHandler.GetProfile)
+		apiV1.GET("/user/subs/:username", userMiddleware, userHandler.GetSubsUser)
 
 		apiV1.POST("/update-user-info", userMiddleware, userHandler.UpdateProfile)
 		apiV1.POST("/user/subscribe/:username", userMiddleware, userHandler.Subscribe)

@@ -81,6 +81,8 @@ services:
     command: server /data --console-address ":9001"
     volumes:
       - minio-data:/data
+    networks:
+      - app-network
     restart: always
 
   users_service:
@@ -123,6 +125,21 @@ services:
       - PostService/.env
     ports:
       - "8082:8082"
+    networks:
+      - app-network
+    restart: always
+
+  frontend:
+    build:
+      context: ../html-frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - auth_service
+      - post_service
+      - users_service
     networks:
       - app-network
     restart: always

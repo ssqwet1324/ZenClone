@@ -17,17 +17,14 @@ const docTemplate = `{
     "paths": {
         "/api/v1/posts/by-user/{userID}": {
             "get": {
-                "description": "Получает список всех постов указанного пользователя",
-                "consumes": [
-                    "application/json"
-                ],
+                "description": "Возвращает список всех постов указанного пользователя",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "posts"
                 ],
-                "summary": "Получение всех постов пользователя",
+                "summary": "Получение постов пользователя",
                 "parameters": [
                     {
                         "type": "string",
@@ -39,19 +36,19 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Список постов успешно получен",
+                        "description": "Список постов получен",
                         "schema": {
                             "$ref": "#/definitions/entity.GetPostsUserSuccessResponse"
                         }
                     },
                     "400": {
-                        "description": "Некорректный запрос",
+                        "description": "Некорректный userID",
                         "schema": {
                             "$ref": "#/definitions/entity.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Посты не найдены",
+                        "description": "Посты пользователя не найдены",
                         "schema": {
                             "$ref": "#/definitions/entity.ErrorResponse"
                         }
@@ -67,7 +64,12 @@ const docTemplate = `{
         },
         "/api/v1/posts/create": {
             "post": {
-                "description": "Создает новый пост для текущего пользователя",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Создает новый пост для текущего аутентифицированного пользователя",
                 "consumes": [
                     "application/json"
                 ],
@@ -79,14 +81,6 @@ const docTemplate = `{
                 ],
                 "summary": "Создание поста",
                 "parameters": [
-                    {
-                        "type": "string",
-                        "default": "Bearer",
-                        "description": "Bearer токен",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
                     {
                         "description": "Данные для создания поста",
                         "name": "input",
@@ -105,13 +99,13 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Некорректный запрос или пустые поля",
+                        "description": "Некорректное тело запроса или пустые поля",
                         "schema": {
                             "$ref": "#/definitions/entity.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Неавторизован",
+                        "description": "Пользователь не авторизован",
                         "schema": {
                             "$ref": "#/definitions/entity.ErrorResponse"
                         }
@@ -127,10 +121,12 @@ const docTemplate = `{
         },
         "/api/v1/posts/delete/{postID}": {
             "delete": {
-                "description": "Удаляет пост текущего пользователя",
-                "consumes": [
-                    "application/json"
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
                 ],
+                "description": "Удаляет пост, принадлежащий текущему пользователю",
                 "produces": [
                     "application/json"
                 ],
@@ -141,15 +137,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "default": "Bearer",
-                        "description": "Bearer токен",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "ID поста для удаления",
+                        "description": "ID поста",
                         "name": "postID",
                         "in": "path",
                         "required": true
@@ -157,19 +145,19 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Пост успешно удален",
+                        "description": "Пост успешно удалён",
                         "schema": {
                             "$ref": "#/definitions/entity.DeletePostSuccessResponse"
                         }
                     },
                     "400": {
-                        "description": "Некорректный запрос",
+                        "description": "Некорректный postID",
                         "schema": {
                             "$ref": "#/definitions/entity.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Неавторизован",
+                        "description": "Пользователь не авторизован",
                         "schema": {
                             "$ref": "#/definitions/entity.ErrorResponse"
                         }
@@ -191,7 +179,12 @@ const docTemplate = `{
         },
         "/api/v1/posts/update/{postID}": {
             "post": {
-                "description": "Обновляет существующий пост текущего пользователя",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Обновляет существующий пост, принадлежащий текущему пользователю",
                 "consumes": [
                     "application/json"
                 ],
@@ -205,15 +198,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "default": "Bearer",
-                        "description": "Bearer токен",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "ID поста для обновления",
+                        "description": "ID поста",
                         "name": "postID",
                         "in": "path",
                         "required": true
@@ -230,19 +215,19 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Пост успешно обновлен",
+                        "description": "Пост успешно обновлён",
                         "schema": {
                             "$ref": "#/definitions/entity.UpdatePostSuccessResponse"
                         }
                     },
                     "400": {
-                        "description": "Некорректный запрос или пустые поля",
+                        "description": "Некорректный postID или пустые поля",
                         "schema": {
                             "$ref": "#/definitions/entity.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Неавторизован",
+                        "description": "Пользователь не авторизован",
                         "schema": {
                             "$ref": "#/definitions/entity.ErrorResponse"
                         }

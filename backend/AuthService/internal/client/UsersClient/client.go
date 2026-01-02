@@ -18,7 +18,7 @@ const (
 
 type ClientProvider interface {
 	AddUser(ctx context.Context, userData RegisterRequest) error
-	CompareAuthData(ctx context.Context, userData AuthRequest) (string, error)
+	CompareAuthData(ctx context.Context, userData AuthRequest) (*AuthResponse, error)
 	GetRefreshToken(ctx context.Context, token TokenRequest) (string, error)
 	UpdateRefreshToken(ctx context.Context, req UpdateRefreshTokenRequest) error
 }
@@ -66,7 +66,7 @@ func (c *clientService) AddUser(ctx context.Context, userData RegisterRequest) e
 }
 
 // CompareAuthData - сравнение данных для входа
-func (c *clientService) CompareAuthData(ctx context.Context, userData AuthRequest) (string, error) {
+func (c *clientService) CompareAuthData(ctx context.Context, userData AuthRequest) (*AuthResponse, error) {
 	var errResp entity.ErrorResponse
 
 	response, err := c.client.R().
@@ -77,20 +77,20 @@ func (c *clientService) CompareAuthData(ctx context.Context, userData AuthReques
 
 	if err != nil {
 		c.log.Error("Error comparing auth data", zap.Error(err))
-		return "", entity.ErrInternalServer
+		return nil, entity.ErrInternalServer
 	}
 
 	if response.IsError() {
-		return "", errResp
+		return nil, errResp
 	}
 
 	var authResponse AuthResponse
 	if err := json.Unmarshal(response.Body(), &authResponse); err != nil {
 		c.log.Error("Error unmarshalling AuthResponse", zap.Error(err))
-		return "", entity.ErrCannotParseClaims
+		return nil, entity.ErrCannotParseClaims
 	}
 
-	return authResponse.ID, nil
+	return &authResponse, nil
 }
 
 // GetRefreshToken  - получаем refresh токен

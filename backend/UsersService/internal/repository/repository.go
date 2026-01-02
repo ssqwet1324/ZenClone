@@ -20,7 +20,6 @@ import (
 )
 
 const (
-	defaultAvatar         = "defaultFoto/default.jpg"
 	maxConnectionsFomPgx  = 20
 	minConnectionsFromPgx = 5
 )
@@ -143,8 +142,8 @@ func (repo *PostgresRepository) GetLoginByUserID(ctx context.Context, id uuid.UU
 func (repo *PostgresRepository) GetUserInfoByLogin(ctx context.Context, login string) (*entity.LoginResponse, error) {
 	var userInfo entity.LoginResponse
 
-	err := repo.db.QueryRow(ctx, `SELECT id, password FROM Users WHERE login = $1`, login).
-		Scan(&userInfo.ID, &userInfo.Password)
+	err := repo.db.QueryRow(ctx, `SELECT id, password, username FROM Users WHERE login = $1`, login).
+		Scan(&userInfo.ID, &userInfo.Password, &userInfo.Username)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, fmt.Errorf("GetUserInfo: User not found")
 	}
@@ -190,6 +189,26 @@ func (repo *PostgresRepository) GetUserProfileByUsername(ctx context.Context, us
 
 	if err != nil {
 		return nil, fmt.Errorf("GetUserProfileByUsername: Error getting user information: %v", err)
+	}
+
+	return &userInfoResponse, nil
+}
+
+// GetUserProfileByID - получаем данные пользователя для профиля по ID
+func (repo *PostgresRepository) GetUserProfileByID(ctx context.Context, userID uuid.UUID) (*entity.ProfileUserInfoResponse, error) {
+	var userInfoResponse entity.ProfileUserInfoResponse
+
+	err := repo.db.QueryRow(ctx, `SELECT first_name, last_name, bio, avatar_url FROM Users WHERE id = $1`,
+		userID).Scan(&userInfoResponse.FirstName,
+		&userInfoResponse.LastName,
+		&userInfoResponse.Bio,
+		&userInfoResponse.UserAvatarUrl)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("GetUserProfileByID: User not found")
+		}
+		return nil, fmt.Errorf("GetUserProfileByID: Error getting user information: %v", err)
 	}
 
 	return &userInfoResponse, nil
@@ -245,18 +264,18 @@ func (repo *PostgresRepository) UpdateUserProfile(ctx context.Context, id uuid.U
 }
 
 // GetUserIdByUsername - получить ID по username
-func (repo *PostgresRepository) GetUserIdByUsername(ctx context.Context, username string) (*entity.UserResponse, error) {
-	var userIDResponse entity.UserResponse
-	err := repo.db.QueryRow(ctx, `SELECT id FROM users WHERE username = $1`, username).Scan(&userIDResponse.ID)
+func (repo *PostgresRepository) GetUserIdByUsername(ctx context.Context, username string) (string, error) {
+	var userIDResponse string
+	err := repo.db.QueryRow(ctx, `SELECT id FROM users WHERE username = $1`, username).Scan(&userIDResponse)
 	if err != nil {
-		return nil, fmt.Errorf("GetUserIdByUsername: Error getting user information: %v", err)
+		return "", fmt.Errorf("GetUserIdByUsername: Error getting user information: %v", err)
 	}
 
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, fmt.Errorf("GetUserIdByUsername: User not found")
+		return "", fmt.Errorf("GetUserIdByUsername: User not found")
 	}
 
-	return &userIDResponse, nil
+	return userIDResponse, nil
 }
 
 // SubscribeFromUser - подписаться на пользователя
@@ -316,4 +335,20 @@ func (repo *PostgresRepository) UnsubscribeFromUser(ctx context.Context, followe
 	}
 
 	return nil
+}
+
+// CheckSubscription - проверить подписан ли пользователь на другого пользователя
+func (repo *PostgresRepository) CheckSubscription(ctx context.Context, followerID string, followingID string) (bool, error) {
+	var isSubscribed int
+
+	err := repo.db.QueryRow(ctx, `SELECT 1 FROM subscriptions WHERE follower_id = $1 AND following_id = $2`, followerID, followingID).Scan(&isSubscribed)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, nil
+		}
+
+		return false, fmt.Errorf("CheckSubscription: error checking subscription: %w", err)
+	}
+
+	return true, nil
 }

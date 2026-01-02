@@ -15,8 +15,9 @@ type UserRepo interface {
 	AddUser(ctx context.Context, addUserInfo entity.AddUserRequest) error
 	GetUserInfoByLogin(ctx context.Context, login string) (*entity.LoginResponse, error)
 	GetUserProfileByUsername(ctx context.Context, username string) (*entity.ProfileUserInfoResponse, error)
+	GetUserProfileByID(ctx context.Context, userID uuid.UUID) (*entity.ProfileUserInfoResponse, error)
 	UpdateUserProfile(ctx context.Context, id uuid.UUID, updateProfileInfo entity.UpdateUserProfileInfoRequest) error
-	GetUserIdByUsername(ctx context.Context, username string) (*entity.UserResponse, error)
+	GetUserIdByUsername(ctx context.Context, username string) (string, error)
 	CheckUser(ctx context.Context, username string) (bool, error)
 	GetLoginByUserID(ctx context.Context, id uuid.UUID) (string, error)
 }
@@ -32,6 +33,7 @@ type SubscriptionRepo interface {
 	SubscribeFromUser(ctx context.Context, followerID, followingID uuid.UUID) error
 	UnsubscribeFromUser(ctx context.Context, followerID, followingID uuid.UUID) error
 	GetSubsUser(ctx context.Context, userID uuid.UUID) (*entity.SubsList, error)
+	CheckSubscription(ctx context.Context, followerID string, followingID string) (bool, error)
 }
 
 // AvatarStorage - описывает функции хранения аватарок пользователекй
@@ -95,6 +97,7 @@ func (s *UserService) CompareAuthData(ctx context.Context, users entity.AuthRequ
 	}
 
 	compareData.ID = response.ID
+	compareData.Username = response.Username
 
 	err = bcrypt.CompareHashAndPassword([]byte(response.Password), []byte(users.Password))
 	if err != nil {
@@ -130,18 +133,24 @@ func (s *UserService) UpdateRefreshToken(ctx context.Context, req entity.UpdateR
 	return nil
 }
 
-// GetUserProfileByUsername - получить профиль по username
-func (s *UserService) GetUserProfileByUsername(ctx context.Context, username string) (*entity.ProfileUserInfoResponse, error) {
-	userInfo, err := s.repo.GetUserProfileByUsername(ctx, username)
+// GetUserProfileByID - получить профиль по ID пользователя
+func (s *UserService) GetUserProfileByID(ctx context.Context, yourUserID uuid.UUID, otherUserID uuid.UUID) (*entity.ProfileUserInfoResponse, error) {
+	userInfo, err := s.repo.GetUserProfileByID(ctx, otherUserID)
 	if err != nil {
-		s.log.Error("GetUserProfileByUsername: failed to get user info by username", zap.Error(err))
+		s.log.Error("GetUserProfileByID: failed to get user info by id", zap.String("userID", otherUserID.String()), zap.Error(err))
 		return nil, entity.ErrFailedToGetUserInfo
 	}
 
-	avatarURL, err := s.GetAvatarURL(ctx, s.cfg.BucketName, username)
+	avatarURL, err := s.repo.GetAvatarURL(ctx, s.cfg.BucketName, otherUserID)
 	if err != nil {
-		s.log.Error("GetUserProfileByUsername: failed to get avatar url", zap.Error(err))
+		s.log.Error("GetUserProfileByID: failed to get avatar url", zap.Error(err))
 		return nil, entity.ErrFailedToGetAvatarURL
+	}
+
+	isSubscribed, err := s.repo.CheckSubscription(ctx, yourUserID.String(), otherUserID.String())
+	if err != nil {
+		s.log.Error("GetUserProfileByID: failed to check subscription", zap.String("userID", otherUserID.String()), zap.Error(err))
+		return nil, entity.ErrUserNotFound
 	}
 
 	return &entity.ProfileUserInfoResponse{
@@ -149,6 +158,7 @@ func (s *UserService) GetUserProfileByUsername(ctx context.Context, username str
 		LastName:      userInfo.LastName,
 		Bio:           userInfo.Bio,
 		UserAvatarUrl: avatarURL,
+		IsSubscribed:  isSubscribed,
 	}, nil
 }
 
@@ -206,33 +216,23 @@ func (s *UserService) UpdateUserProfile(ctx context.Context, id uuid.UUID, updat
 }
 
 // GetUserIDByUsername - получить id пользователя по username
-func (s *UserService) GetUserIDByUsername(ctx context.Context, username string) (*entity.UserResponse, error) {
-	var user entity.UserResponse
-
+func (s *UserService) GetUserIDByUsername(ctx context.Context, username string) (string, error) {
 	userID, err := s.repo.GetUserIdByUsername(ctx, username)
 	if err != nil {
 		s.log.Error("GetUserIDByUsername: failed to get user info by username", zap.String("username", username), zap.Error(err))
-		return nil, entity.ErrInternalServer
+		return "", entity.ErrInternalServer
 	}
 
-	if userID == nil {
-		return nil, entity.ErrUserNotFound
+	if userID == "" {
+		return "", entity.ErrUserNotFound
 	}
 
-	user.ID = userID.ID
-
-	return &user, nil
+	return userID, nil
 }
 
 // SubscribeToUser - подписаться на пользователя
-func (s *UserService) SubscribeToUser(ctx context.Context, followerID uuid.UUID, username string) error {
-	followingID, err := s.repo.GetUserIdByUsername(ctx, username)
-	if err != nil {
-		s.log.Error("SubscribeToUser: failed get userID by username", zap.Error(err))
-		return entity.ErrUserNotFound
-	}
-
-	err = s.repo.SubscribeFromUser(ctx, followerID, followingID.ID)
+func (s *UserService) SubscribeToUser(ctx context.Context, followerID uuid.UUID, followingID uuid.UUID) error {
+	err := s.repo.SubscribeFromUser(ctx, followerID, followingID)
 	if err != nil {
 		s.log.Error("SubscribeToUser: failed subscribe to user", zap.Error(err))
 		return entity.ErrFailedToSubscribe
@@ -242,14 +242,8 @@ func (s *UserService) SubscribeToUser(ctx context.Context, followerID uuid.UUID,
 }
 
 // GetSubsUser - получить подписки пользователя
-func (s *UserService) GetSubsUser(ctx context.Context, username string) (*entity.SubsList, error) {
-	targetUserID, err := s.repo.GetUserIdByUsername(ctx, username)
-	if err != nil {
-		s.log.Error("GetSubsUser: failed to get user info by username", zap.Error(err))
-		return nil, entity.ErrUserNotFound
-	}
-
-	data, err := s.repo.GetSubsUser(ctx, targetUserID.ID)
+func (s *UserService) GetSubsUser(ctx context.Context, userID uuid.UUID) (*entity.SubsList, error) {
+	data, err := s.repo.GetSubsUser(ctx, userID)
 	if err != nil {
 		s.log.Error("GetSubsUser: failed to get subs user", zap.Error(err))
 		return nil, entity.ErrFailedToGetUserInfo
@@ -263,14 +257,8 @@ func (s *UserService) GetSubsUser(ctx context.Context, username string) (*entity
 }
 
 // UnsubscribeFromUser - отписаться от пользователя
-func (s *UserService) UnsubscribeFromUser(ctx context.Context, followerID uuid.UUID, targetUsername string) error {
-	targetUserID, err := s.repo.GetUserIdByUsername(ctx, targetUsername)
-	if err != nil {
-		s.log.Error("UnsubscribeFromUser: failed to get user info by username", zap.Error(err))
-		return entity.ErrUserNotFound
-	}
-
-	err = s.repo.UnsubscribeFromUser(ctx, followerID, targetUserID.ID)
+func (s *UserService) UnsubscribeFromUser(ctx context.Context, followerID uuid.UUID, followingID uuid.UUID) error {
+	err := s.repo.UnsubscribeFromUser(ctx, followerID, followingID)
 	if err != nil {
 		s.log.Error("UnsubscribeFromUser: failed to unsubscribe from user", zap.Error(err))
 		return entity.ErrFailedToUnsubscribe
@@ -290,15 +278,9 @@ func (s *UserService) UploadAvatar(ctx context.Context, userID uuid.UUID, avatar
 	return nil
 }
 
-// GetAvatarURL - получить url аватара
-func (s *UserService) GetAvatarURL(ctx context.Context, bucketName string, username string) (string, error) {
-	userID, err := s.repo.GetUserIdByUsername(ctx, username)
-	if err != nil {
-		s.log.Error("GetAvatarURL: failed to get user info by username", zap.Error(err))
-		return "", entity.ErrUserNotFound
-	}
-
-	url, err := s.repo.GetAvatarURL(ctx, bucketName, userID.ID)
+// GetAvatarURL - получить url аватара (метод оставлен для обратной совместимости, но теперь не используется в GetUserProfileByID)
+func (s *UserService) GetAvatarURL(ctx context.Context, bucketName string, userID uuid.UUID) (string, error) {
+	url, err := s.repo.GetAvatarURL(ctx, bucketName, userID)
 	if err != nil {
 		s.log.Error("GetAvatarURL: failed to get avatar url", zap.Error(err))
 		return "", entity.ErrFailedToGetAvatarURL

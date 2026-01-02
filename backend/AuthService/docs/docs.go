@@ -17,7 +17,7 @@ const docTemplate = `{
     "paths": {
         "/api/v1/auth/login": {
             "post": {
-                "description": "Аутентификация пользователя по логину и паролю, возвращает access и refresh токены",
+                "description": "Выполняет вход пользователя по логину и паролю и возвращает access и refresh JWT токены",
                 "consumes": [
                     "application/json"
                 ],
@@ -27,10 +27,10 @@ const docTemplate = `{
                 "tags": [
                     "auth"
                 ],
-                "summary": "Вход в систему",
+                "summary": "Аутентификация пользователя",
                 "parameters": [
                     {
-                        "description": "Данные для входа",
+                        "description": "Логин и пароль пользователя",
                         "name": "input",
                         "in": "body",
                         "required": true,
@@ -41,13 +41,13 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Успешный вход, выданы токены",
+                        "description": "Аутентификация прошла успешно",
                         "schema": {
                             "$ref": "#/definitions/entity.LoginResponse"
                         }
                     },
                     "400": {
-                        "description": "Некорректный запрос",
+                        "description": "Некорректное тело запроса",
                         "schema": {
                             "$ref": "#/definitions/entity.ErrorResponse"
                         }
@@ -69,7 +69,7 @@ const docTemplate = `{
         },
         "/api/v1/auth/refresh": {
             "post": {
-                "description": "Обновляет access и refresh токены по текущему access токену и refresh токену",
+                "description": "Обновляет access и refresh токены по валидному refresh токену и access токену из заголовка Authorization",
                 "consumes": [
                     "application/json"
                 ],
@@ -79,18 +79,18 @@ const docTemplate = `{
                 "tags": [
                     "auth"
                 ],
-                "summary": "Обновление access и refresh токенов",
+                "summary": "Обновление JWT токенов",
                 "parameters": [
                     {
                         "type": "string",
-                        "default": "Bearer",
-                        "description": "Bearer токен (текущий access token)",
+                        "example": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                        "description": "Bearer access token",
                         "name": "Authorization",
                         "in": "header",
                         "required": true
                     },
                     {
-                        "description": "Данные для обновления токенов",
+                        "description": "Refresh токен",
                         "name": "input",
                         "in": "body",
                         "required": true,
@@ -107,13 +107,13 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Некорректный запрос или отсутствует заголовок Authorization",
+                        "description": "Отсутствует refresh token или заголовок Authorization",
                         "schema": {
                             "$ref": "#/definitions/entity.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Невалидный/просроченный токен или refresh token не найден",
+                        "description": "Токен невалиден или истёк срок действия",
                         "schema": {
                             "$ref": "#/definitions/entity.ErrorResponse"
                         }
@@ -129,7 +129,7 @@ const docTemplate = `{
         },
         "/api/v1/auth/register": {
             "post": {
-                "description": "Создаёт нового пользователя и возвращает access и refresh токены",
+                "description": "Регистрирует нового пользователя, создаёт учётную запись и возвращает access и refresh JWT токены",
                 "consumes": [
                     "application/json"
                 ],
@@ -142,7 +142,7 @@ const docTemplate = `{
                 "summary": "Регистрация пользователя",
                 "parameters": [
                     {
-                        "description": "Данные для регистрации",
+                        "description": "Данные для регистрации пользователя",
                         "name": "input",
                         "in": "body",
                         "required": true,
@@ -159,7 +159,13 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Некорректный запрос",
+                        "description": "Некорректное тело запроса",
+                        "schema": {
+                            "$ref": "#/definitions/entity.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Пользователь с таким логином уже существует",
                         "schema": {
                             "$ref": "#/definitions/entity.ErrorResponse"
                         }
@@ -204,6 +210,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "refresh_token": {
+                    "type": "string"
+                },
+                "username": {
                     "type": "string"
                 }
             }
@@ -263,6 +272,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "refresh_token": {
+                    "type": "string"
+                },
+                "username": {
                     "type": "string"
                 }
             }

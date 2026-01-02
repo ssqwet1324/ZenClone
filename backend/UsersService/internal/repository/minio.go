@@ -10,6 +10,10 @@ import (
 	"github.com/minio/minio-go/v7"
 )
 
+const (
+	defaultAvatar = "defaultFoto/default.jpg"
+)
+
 // UploadAvatar - загружаем фото и сохраняем его имя в бд
 func (repo *PostgresRepository) UploadAvatar(ctx context.Context, userID uuid.UUID, bucketName string, avatarInfo entity.AvatarRequest) error {
 	// timestamp, чтобы ссылка менялась при каждой загрузке

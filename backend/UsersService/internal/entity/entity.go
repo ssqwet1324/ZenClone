@@ -1,7 +1,6 @@
 package entity
 
 import (
-	"errors"
 	"io"
 
 	"github.com/google/uuid"
@@ -15,7 +14,8 @@ type AuthRequest struct {
 
 // CompareDataResponse - отдаем id в сервис
 type CompareDataResponse struct {
-	ID uuid.UUID `json:"id"`
+	ID       uuid.UUID `json:"id"`
+	Username string    `json:"username"`
 }
 
 // TokenRequest - получение токена по id
@@ -49,6 +49,7 @@ type AddUserRequest struct {
 type LoginResponse struct {
 	ID       uuid.UUID `json:"id"`
 	Password string    `json:"password"`
+	Username string    `json:"username"`
 }
 
 // RefreshTokenResponse - запрос для получения токена
@@ -62,6 +63,7 @@ type ProfileUserInfoResponse struct {
 	LastName      string `json:"last_name"`
 	Bio           string `json:"bio"`
 	UserAvatarUrl string `json:"user_avatar_url"`
+	IsSubscribed  bool   `json:"is_subscribed"`
 }
 
 // UpdateUserProfileInfoRequest - обновление данных в профиле
@@ -126,7 +128,8 @@ type UpdateRefreshTokenResponse struct {
 
 // CompareAuthPasswordResponse - ответ на сравнение данных авторизации
 type CompareAuthPasswordResponse struct {
-	ID string `json:"id"`
+	ID       string `json:"id"`
+	Username string `json:"username"`
 }
 
 // AddUserResponse - ответ на создание пользователя
@@ -148,32 +151,3 @@ type UnsubscribeResponse struct {
 type UploadAvatarResponse struct {
 	Message string `json:"message"`
 }
-
-var (
-	// Ошибки авторизации
-	ErrUserNotFound      = errors.New("user not found")
-	ErrIncorrectPassword = errors.New("incorrect password or login")
-
-	// Ошибки при работе с пользователем
-	ErrUserAlreadyExists     = errors.New("user with this login already exists")
-	ErrFailedToAddUser       = errors.New("failed to add user")
-	ErrFailedToUpdateProfile = errors.New("failed to update user profile")
-	ErrFailedToGetUserInfo   = errors.New("failed to get user info")
-
-	// Ошибки токенов
-	ErrFailedToGetRefreshToken    = errors.New("failed to get refresh token")
-	ErrFailedToUpdateRefreshToken = errors.New("failed to update refresh token")
-
-	// Ошибки подписок
-	ErrFailedToSubscribe   = errors.New("failed to subscribe to user")
-	ErrFailedToUnsubscribe = errors.New("failed to unsubscribe from user")
-	ErrNoSubscriptions     = errors.New("no subscriptions found")
-
-	// Ошибки аватаров
-	ErrFailedToUploadAvatar = errors.New("failed to upload avatar")
-	ErrFailedToGetAvatarURL = errors.New("failed to get avatar URL")
-
-	// Общие
-	ErrInternalServer = errors.New("internal server error")
-	ErrInvalidRequest = errors.New("invalid request structure")
-)

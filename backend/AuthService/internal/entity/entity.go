@@ -27,6 +27,7 @@ type RegisterResponse struct {
 	ID           string `json:"id"`
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
+	Username     string `json:"username"`
 }
 
 // LoginResponse - ответ сервиса на авторизацию
@@ -34,6 +35,7 @@ type LoginResponse struct {
 	ID           string `json:"id"`
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
+	Username     string `json:"username"`
 }
 
 // RefreshResponse - ответ сервиса при обновлении токенов

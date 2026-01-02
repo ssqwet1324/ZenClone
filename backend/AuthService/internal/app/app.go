@@ -16,6 +16,8 @@ import (
 func Run() {
 	server := gin.Default()
 
+	server.Use(middleware.ServerMiddleware())
+
 	cfg, err := config.New()
 	if err != nil {
 		panic("ErrorDetail loading config" + err.Error())

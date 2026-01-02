@@ -18,7 +18,8 @@ type AuthRequest struct {
 
 // AuthResponse - ответ сервиса
 type AuthResponse struct {
-	ID string `json:"id"`
+	ID       string `json:"id"`
+	Username string `json:"username"`
 }
 
 // RegisterRequest - информация о пользователе
