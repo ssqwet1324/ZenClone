@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZenClone - Социальная сеть</title>
+    <link rel="stylesheet" href="styles.css?v=1.1">
+</head>
+<body>
+    <!-- Навигация -->
+    <nav class="navbar" id="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">ZenClone</div>
+            <div class="nav-menu" id="navMenu">
+                <button class="nav-btn" id="profileBtn" style="display: none;">Мой профиль</button>
+                <button class="nav-btn" id="logoutBtn" style="display: none;">Выйти</button>
+                <button class="nav-btn primary" id="loginBtn">Войти</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Модальное окно входа/регистрации -->
+    <div class="modal" id="authModal">
+        <div class="modal-content">
+            <span class="close" id="closeModal">&times;</span>
+            <div class="auth-tabs">
+                <button class="tab-btn active" id="loginTab">Вход</button>
+                <button class="tab-btn" id="registerTab">Регистрация</button>
+            </div>
+
+            <!-- Форма входа -->
+            <form id="loginForm" class="auth-form active">
+                <h2>Вход в аккаунт</h2>
+                <div class="form-group">
+                    <label for="loginEmail">Логин</label>
+                    <input type="text" id="loginEmail" name="login" required>
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">Пароль</label>
+                    <input type="password" id="loginPassword" name="password" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Войти</button>
+                <div class="error-message" id="loginError"></div>
+            </form>
+
+            <!-- Форма регистрации -->
+            <form id="registerForm" class="auth-form">
+                <h2>Регистрация</h2>
+                <div class="form-group">
+                    <label for="regLogin">Логин</label>
+                    <input type="text" id="regLogin" name="login" required>
+                </div>
+                <div class="form-group">
+                    <label for="regPassword">Пароль</label>
+                    <input type="password" id="regPassword" name="password" required>
+                </div>
+                <div class="form-group">
+                    <label for="regUsername">Имя пользователя</label>
+                    <input type="text" id="regUsername" name="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="regFirstName">Имя</label>
+                    <input type="text" id="regFirstName" name="first_name">
+                </div>
+                <div class="form-group">
+                    <label for="regLastName">Фамилия</label>
+                    <input type="text" id="regLastName" name="last_name">
+                </div>
+                <div class="form-group">
+                    <label for="regBio">О себе</label>
+                    <textarea id="regBio" name="bio" rows="3"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Зарегистрироваться</button>
+                <div class="error-message" id="registerError"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Главная страница -->
+    <div class="container" id="mainContainer">
+        <div class="welcome-screen">
+            <h1>Добро пожаловать в ZenClone</h1>
+            <p>Социальная сеть для общения и обмена контентом</p>
+            <button class="btn btn-primary btn-large" id="getStartedBtn">Начать</button>
+        </div>
+    </div>
+
+    <!-- Страница профиля -->
+    <div class="container" id="profileContainer" style="display: none;">
+        <div class="profile-header">
+            <div class="avatar-container">
+                <img id="profileAvatar" src="" alt="Аватар" class="avatar-large">
+                <label for="avatarInput" class="avatar-upload-btn" id="avatarUploadLabel" style="display: none;">
+                    <span>📷</span>
+                </label>
+                <input type="file" id="avatarInput" accept="image/*" style="display: none;">
+            </div>
+            <div class="profile-info">
+                <h1 id="profileName">Имя пользователя</h1>
+                <p id="profileBio">Биография</p>
+                <div class="profile-actions">
+                    <button class="btn btn-secondary" id="editProfileBtn" style="display: none;">Редактировать профиль</button>
+                    <button class="btn btn-primary" id="subscribeBtn" style="display: none;">Подписаться</button>
+                    <button class="btn btn-secondary" id="unsubscribeBtn" style="display: none;">Отписаться</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="profile-tabs">
+            <button class="tab-btn active" data-tab="posts">Посты</button>
+            <button class="tab-btn" data-tab="subscriptions">Подписки</button>
+        </div>
+
+        <div class="tab-content active" id="postsTab">
+            <div class="posts-header" id="postsHeader">
+                <button class="btn btn-primary" id="createPostBtn">+ Создать пост</button>
+            </div>
+            <div id="postsList" class="posts-list"></div>
+        </div>
+
+        <div class="tab-content" id="subscriptionsTab">
+            <div id="subscriptionsList" class="subscriptions-list"></div>
+        </div>
+    </div>
+
+    <!-- Модальное окно создания поста -->
+    <div class="modal" id="createPostModal">
+        <div class="modal-content">
+            <span class="close" id="closeCreatePostModal">&times;</span>
+            <h2>Создать новый пост</h2>
+            <form id="createPostForm">
+                <div class="form-group">
+                    <label for="postTitle">Заголовок</label>
+                    <input type="text" id="postTitle" name="title" required placeholder="Введите заголовок поста">
+                </div>
+                <div class="form-group">
+                    <label for="postContent">Содержание</label>
+                    <textarea id="postContent" name="content" rows="6" required placeholder="Напишите что-нибудь..."></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Опубликовать</button>
+                <div class="error-message" id="createPostError"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Модальное окно редактирования поста -->
+    <div class="modal" id="editPostModal">
+        <div class="modal-content">
+            <span class="close" id="closeEditPostModal">&times;</span>
+            <h2>Редактировать пост</h2>
+            <form id="editPostForm">
+                <input type="hidden" id="editPostId" name="postId">
+                <div class="form-group">
+                    <label for="editPostTitle">Заголовок</label>
+                    <input type="text" id="editPostTitle" name="title" required placeholder="Введите заголовок поста">
+                </div>
+                <div class="form-group">
+                    <label for="editPostContent">Содержание</label>
+                    <textarea id="editPostContent" name="content" rows="6" required placeholder="Напишите что-нибудь..."></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Сохранить изменения</button>
+                <div class="error-message" id="editPostError"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Модальное окно редактирования профиля -->
+    <div class="modal" id="editProfileModal">
+        <div class="modal-content">
+            <span class="close" id="closeEditModal">&times;</span>
+            <h2>Редактировать профиль</h2>
+            <form id="editProfileForm">
+                <div class="form-group">
+                    <label for="editUsername">Имя пользователя</label>
+                    <input type="text" id="editUsername" name="username">
+                </div>
+                <div class="form-group">
+                    <label for="editFirstName">Имя</label>
+                    <input type="text" id="editFirstName" name="first_name">
+                </div>
+                <div class="form-group">
+                    <label for="editLastName">Фамилия</label>
+                    <input type="text" id="editLastName" name="last_name">
+                </div>
+                <div class="form-group">
+                    <label for="editBio">О себе</label>
+                    <textarea id="editBio" name="bio" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="editPasswordOld">Старый пароль (для смены пароля)</label>
+                    <input type="password" id="editPasswordOld" name="password_old">
+                </div>
+                <div class="form-group">
+                    <label for="editPasswordNew">Новый пароль</label>
+                    <input type="password" id="editPasswordNew" name="password_new">
+                </div>
+                <button type="submit" class="btn btn-primary">Сохранить</button>
+                <div class="error-message" id="editProfileError"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Модули приложения -->
+    <script src="js/state.js?v=2.2"></script>
+    <script src="js/utils.js?v=2.2"></script>
+    <script src="js/api.js?v=2.2"></script>
+    <script src="js/auth.js?v=2.2"></script>
+    <script src="js/profile.js?v=2.2"></script>
+    <script src="js/posts.js?v=2.2"></script>
+    <script src="app.js?v=2.2"></script>
+    <script>
+        // Проверка загрузки после DOMContentLoaded
+        window.addEventListener('DOMContentLoaded', () => {
+            console.log('Проверка элементов:');
+            console.log('loginBtn:', document.getElementById('loginBtn') ? '✓' : '✗');
+            console.log('getStartedBtn:', document.getElementById('getStartedBtn') ? '✓' : '✗');
+            console.log('authModal:', document.getElementById('authModal') ? '✓' : '✗');
+        });
+    </script>
+</body>
+</html>
+
