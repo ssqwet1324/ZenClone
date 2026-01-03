@@ -115,10 +115,12 @@ async function loadSubscriptions(username) {
         if (data.subs && data.subs.length > 0) {
             subscriptionsList.innerHTML = data.subs.map(sub => {
                 const displayName = `${sub.first_name || ''} ${sub.last_name || ''}`.trim() || sub.username;
+                const avatarUrl = sub.user_avatar_url || `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Ccircle cx='40' cy='40' r='40' fill='%236366f1'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='white' font-size='30' font-family='Arial'%3E${sub.username.charAt(0).toUpperCase()}%3C/text%3E%3C/svg%3E`;
                 return `
                 <div class="subscription-card" data-username="${escapeHtml(sub.username)}">
-                    <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Ccircle cx='40' cy='40' r='40' fill='%236366f1'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='white' font-size='30' font-family='Arial'%3E${sub.username.charAt(0).toUpperCase()}%3C/text%3E%3C/svg%3E" 
-                         alt="${escapeHtml(sub.username)}" class="subscription-avatar">
+                    <img src="${avatarUrl}" 
+                         alt="${escapeHtml(sub.username)}" class="subscription-avatar"
+                         onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'80\' height=\'80\'%3E%3Ccircle cx=\'40\' cy=\'40\' r=\'40\' fill=\'%236366f1\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' text-anchor=\'middle\' dy=\'.3em\' fill=\'white\' font-size=\'30\' font-family=\'Arial\'%3E${sub.username.charAt(0).toUpperCase()}%3C/text%3E%3C/svg%3E'">
                     <h3>${escapeHtml(displayName)}</h3>
                     <p>@${escapeHtml(sub.username)}</p>
                 </div>

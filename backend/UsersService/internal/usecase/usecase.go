@@ -20,6 +20,7 @@ type UserRepo interface {
 	GetUserIdByUsername(ctx context.Context, username string) (string, error)
 	CheckUser(ctx context.Context, username string) (bool, error)
 	GetLoginByUserID(ctx context.Context, id uuid.UUID) (string, error)
+	GlobalSearchPeople(ctx context.Context, firstName, lastName string, bucketName string) (*entity.PersonDateList, error)
 }
 
 // TokenRepo - описывает функции взаимодействия с токенами
@@ -32,7 +33,7 @@ type TokenRepo interface {
 type SubscriptionRepo interface {
 	SubscribeFromUser(ctx context.Context, followerID, followingID uuid.UUID) error
 	UnsubscribeFromUser(ctx context.Context, followerID, followingID uuid.UUID) error
-	GetSubsUser(ctx context.Context, userID uuid.UUID) (*entity.SubsList, error)
+	GetSubsUser(ctx context.Context, userID uuid.UUID, bucketName string) (*entity.SubsList, error)
 	CheckSubscription(ctx context.Context, followerID string, followingID string) (bool, error)
 }
 
@@ -50,24 +51,24 @@ type RepositoryProvider interface {
 	AvatarStorage
 }
 
-// UserService - структура бизнес логики
-type UserService struct {
+// Usecase - структура бизнес логики
+type Usecase struct {
 	repo RepositoryProvider
 	cfg  *config.Config
 	log  *zap.Logger
 }
 
 // New - конструктор
-func New(repo RepositoryProvider, cfg *config.Config, log *zap.Logger) *UserService {
-	return &UserService{
+func New(repo RepositoryProvider, cfg *config.Config, log *zap.Logger) *Usecase {
+	return &Usecase{
 		repo: repo,
 		cfg:  cfg,
-		log:  log.Named("UserService"),
+		log:  log.Named("Usecase"),
 	}
 }
 
 // AddUser - создание/ добавление нового пользователя
-func (s *UserService) AddUser(ctx context.Context, addUserInfo entity.AddUserRequest) error {
+func (s *Usecase) AddUser(ctx context.Context, addUserInfo entity.AddUserRequest) error {
 	exist, err := s.repo.CheckUser(ctx, addUserInfo.Username)
 	if err != nil {
 		s.log.Error("AddUser: Error checking user", zap.String("username", addUserInfo.Username), zap.Error(err))
@@ -87,7 +88,7 @@ func (s *UserService) AddUser(ctx context.Context, addUserInfo entity.AddUserReq
 }
 
 // CompareAuthData - сравнение данных
-func (s *UserService) CompareAuthData(ctx context.Context, users entity.AuthRequest) (*entity.CompareDataResponse, error) {
+func (s *Usecase) CompareAuthData(ctx context.Context, users entity.AuthRequest) (*entity.CompareDataResponse, error) {
 	var compareData entity.CompareDataResponse
 
 	response, err := s.repo.GetUserInfoByLogin(ctx, users.Login)
@@ -109,7 +110,7 @@ func (s *UserService) CompareAuthData(ctx context.Context, users entity.AuthRequ
 }
 
 // GetRefreshToken - получить refresh токен пользователя
-func (s *UserService) GetRefreshToken(ctx context.Context, id uuid.UUID) (*entity.TokenResponse, error) {
+func (s *Usecase) GetRefreshToken(ctx context.Context, id uuid.UUID) (*entity.TokenResponse, error) {
 	var tokenResponse entity.TokenResponse
 
 	response, err := s.repo.GetRefreshTokenByUserID(ctx, id)
@@ -124,7 +125,7 @@ func (s *UserService) GetRefreshToken(ctx context.Context, id uuid.UUID) (*entit
 }
 
 // UpdateRefreshToken - обновить токен
-func (s *UserService) UpdateRefreshToken(ctx context.Context, req entity.UpdateRefreshTokenRequest) error {
+func (s *Usecase) UpdateRefreshToken(ctx context.Context, req entity.UpdateRefreshTokenRequest) error {
 	err := s.repo.UpdateRefreshToken(ctx, req.ID, req.RefreshToken)
 	if err != nil {
 		s.log.Error("UpdateRefreshToken: failed to update refresh token", zap.Error(err))
@@ -134,7 +135,7 @@ func (s *UserService) UpdateRefreshToken(ctx context.Context, req entity.UpdateR
 }
 
 // GetUserProfileByID - получить профиль по ID пользователя
-func (s *UserService) GetUserProfileByID(ctx context.Context, yourUserID uuid.UUID, otherUserID uuid.UUID) (*entity.ProfileUserInfoResponse, error) {
+func (s *Usecase) GetUserProfileByID(ctx context.Context, yourUserID uuid.UUID, otherUserID uuid.UUID) (*entity.ProfileUserInfoResponse, error) {
 	userInfo, err := s.repo.GetUserProfileByID(ctx, otherUserID)
 	if err != nil {
 		s.log.Error("GetUserProfileByID: failed to get user info by id", zap.String("userID", otherUserID.String()), zap.Error(err))
@@ -163,7 +164,7 @@ func (s *UserService) GetUserProfileByID(ctx context.Context, yourUserID uuid.UU
 }
 
 // UpdateUserProfile - обновить профиль
-func (s *UserService) UpdateUserProfile(ctx context.Context, id uuid.UUID, updateProfileInfo entity.UpdateUserProfileInfoRequest) (*entity.UpdateUserProfileInfoResponse, error) {
+func (s *Usecase) UpdateUserProfile(ctx context.Context, id uuid.UUID, updateProfileInfo entity.UpdateUserProfileInfoRequest) (*entity.UpdateUserProfileInfoResponse, error) {
 	login, err := s.repo.GetLoginByUserID(ctx, id)
 	if err != nil {
 		s.log.Error("UpdateUserProfile: failed to get user info by userID", zap.Error(err))
@@ -216,7 +217,7 @@ func (s *UserService) UpdateUserProfile(ctx context.Context, id uuid.UUID, updat
 }
 
 // GetUserIDByUsername - получить id пользователя по username
-func (s *UserService) GetUserIDByUsername(ctx context.Context, username string) (string, error) {
+func (s *Usecase) GetUserIDByUsername(ctx context.Context, username string) (string, error) {
 	userID, err := s.repo.GetUserIdByUsername(ctx, username)
 	if err != nil {
 		s.log.Error("GetUserIDByUsername: failed to get user info by username", zap.String("username", username), zap.Error(err))
@@ -231,7 +232,7 @@ func (s *UserService) GetUserIDByUsername(ctx context.Context, username string) 
 }
 
 // SubscribeToUser - подписаться на пользователя
-func (s *UserService) SubscribeToUser(ctx context.Context, followerID uuid.UUID, followingID uuid.UUID) error {
+func (s *Usecase) SubscribeToUser(ctx context.Context, followerID uuid.UUID, followingID uuid.UUID) error {
 	err := s.repo.SubscribeFromUser(ctx, followerID, followingID)
 	if err != nil {
 		s.log.Error("SubscribeToUser: failed subscribe to user", zap.Error(err))
@@ -242,8 +243,8 @@ func (s *UserService) SubscribeToUser(ctx context.Context, followerID uuid.UUID,
 }
 
 // GetSubsUser - получить подписки пользователя
-func (s *UserService) GetSubsUser(ctx context.Context, userID uuid.UUID) (*entity.SubsList, error) {
-	data, err := s.repo.GetSubsUser(ctx, userID)
+func (s *Usecase) GetSubsUser(ctx context.Context, userID uuid.UUID) (*entity.SubsList, error) {
+	data, err := s.repo.GetSubsUser(ctx, userID, s.cfg.BucketName)
 	if err != nil {
 		s.log.Error("GetSubsUser: failed to get subs user", zap.Error(err))
 		return nil, entity.ErrFailedToGetUserInfo
@@ -257,7 +258,7 @@ func (s *UserService) GetSubsUser(ctx context.Context, userID uuid.UUID) (*entit
 }
 
 // UnsubscribeFromUser - отписаться от пользователя
-func (s *UserService) UnsubscribeFromUser(ctx context.Context, followerID uuid.UUID, followingID uuid.UUID) error {
+func (s *Usecase) UnsubscribeFromUser(ctx context.Context, followerID uuid.UUID, followingID uuid.UUID) error {
 	err := s.repo.UnsubscribeFromUser(ctx, followerID, followingID)
 	if err != nil {
 		s.log.Error("UnsubscribeFromUser: failed to unsubscribe from user", zap.Error(err))
@@ -268,7 +269,7 @@ func (s *UserService) UnsubscribeFromUser(ctx context.Context, followerID uuid.U
 }
 
 // UploadAvatar - загрузить аватарку
-func (s *UserService) UploadAvatar(ctx context.Context, userID uuid.UUID, avatarInfo entity.AvatarRequest) error {
+func (s *Usecase) UploadAvatar(ctx context.Context, userID uuid.UUID, avatarInfo entity.AvatarRequest) error {
 	err := s.repo.UploadAvatar(ctx, userID, s.cfg.BucketName, avatarInfo)
 	if err != nil {
 		s.log.Error("UploadAvatar: failed to upload avatar", zap.Error(err))
@@ -279,7 +280,7 @@ func (s *UserService) UploadAvatar(ctx context.Context, userID uuid.UUID, avatar
 }
 
 // GetAvatarURL - получить url аватара (метод оставлен для обратной совместимости, но теперь не используется в GetUserProfileByID)
-func (s *UserService) GetAvatarURL(ctx context.Context, bucketName string, userID uuid.UUID) (string, error) {
+func (s *Usecase) GetAvatarURL(ctx context.Context, bucketName string, userID uuid.UUID) (string, error) {
 	url, err := s.repo.GetAvatarURL(ctx, bucketName, userID)
 	if err != nil {
 		s.log.Error("GetAvatarURL: failed to get avatar url", zap.Error(err))
@@ -287,4 +288,19 @@ func (s *UserService) GetAvatarURL(ctx context.Context, bucketName string, userI
 	}
 
 	return url, nil
+}
+
+// GlobalSearchPeople - поиск профиля по имени фамилии
+func (s *Usecase) GlobalSearchPeople(ctx context.Context, firstName, lastName string) (*entity.PersonDateList, error) {
+	data, err := s.repo.GlobalSearchPeople(ctx, firstName, lastName, s.cfg.BucketName)
+	if err != nil {
+		s.log.Error("GlobalSearchPeople: failed to search people", zap.Error(err))
+		return nil, err
+	}
+
+	if len(data.Persons) == 0 {
+		return nil, entity.ErrUserNotFound
+	}
+
+	return data, nil
 }

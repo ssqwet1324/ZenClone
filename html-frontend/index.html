@@ -11,6 +11,14 @@
     <nav class="navbar" id="navbar">
         <div class="nav-container">
             <div class="nav-brand">ZenClone</div>
+            <div class="nav-search-container" id="navSearchContainer" style="display: none;">
+                <div class="search-box">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" id="searchInput" class="search-input" placeholder="Поиск пользователей... (имя фамилия или @username)">
+                    <button class="search-btn" id="searchBtn">Найти</button>
+                </div>
+                <div class="search-results" id="searchResults" style="display: none;"></div>
+            </div>
             <div class="nav-menu" id="navMenu">
                 <button class="nav-btn" id="profileBtn" style="display: none;">Мой профиль</button>
                 <button class="nav-btn" id="logoutBtn" style="display: none;">Выйти</button>
@@ -207,6 +215,7 @@
     <script src="js/auth.js?v=2.2"></script>
     <script src="js/profile.js?v=2.2"></script>
     <script src="js/posts.js?v=2.2"></script>
+    <script src="js/search.js?v=2.2"></script>
     <script src="app.js?v=2.2"></script>
     <script>
         // Проверка загрузки после DOMContentLoaded

@@ -48,6 +48,7 @@ func Run() {
 		apiV1.POST("/user/subscribe/:username", userMiddleware, userHandler.Subscribe)
 		apiV1.POST("/user/unsubscribe/:username", userMiddleware, userHandler.UnsubscribeFromUser)
 		apiV1.POST("/user/upload-avatar", userMiddleware, userHandler.UploadAvatar)
+		apiV1.GET("/user/search", userMiddleware, userHandler.GlobalSearchUser)
 	}
 
 	internalApi := server.Group("/internal")

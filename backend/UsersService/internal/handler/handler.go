@@ -16,11 +16,11 @@ import (
 const maxAvatarSize = 50 * 1024 * 1024
 
 type UsersHandler struct {
-	uc  *usecase.UserService
+	uc  *usecase.Usecase
 	log *zap.Logger
 }
 
-func New(uc *usecase.UserService, log *zap.Logger) *UsersHandler {
+func New(uc *usecase.Usecase, log *zap.Logger) *UsersHandler {
 	return &UsersHandler{
 		uc:  uc,
 		log: log.Named("UsersHandler"),
@@ -863,4 +863,118 @@ func (h *UsersHandler) UploadAvatar(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, entity.UploadAvatarResponse{
 		Message: "avatar uploaded successfully",
 	})
+}
+
+// GlobalSearchUser godoc
+// @Summary      Глобальный поиск пользователей
+// @Description  Поиск пользователей по имени+фамилии ИЛИ по username
+// @Tags         Пользователи
+// @Accept       json
+// @Produce      json
+// @Param        Authorization  header     string  true  "Bearer JWT токен"
+// @Param        first_name     query      string  false "Имя пользователя"
+// @Param        last_name      query      string  false "Фамилия пользователя"
+// @Param        username       query      string  false "Username пользователя"
+// @Success      200  {object}  entity.PersonDateList  "Список найденных пользователей"
+// @Failure      400  {object}  entity.ErrorResponse   "Неверные параметры запроса"
+// @Failure      401  {object}  entity.ErrorResponse   "Не авторизован"
+// @Failure      404  {object}  entity.ErrorResponse   "Пользователь не найден"
+// @Failure      500  {object}  entity.ErrorResponse   "Внутренняя ошибка сервера"
+// @Router       /users/search [get]
+func (h *UsersHandler) GlobalSearchUser(ctx *gin.Context) {
+	yourUserJWTID, err := getUserIDFromJWTToken(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusUnauthorized, entity.ErrorResponse{
+			Error: entity.ErrorDetail{
+				Code:    "UNAUTHORIZED",
+				Message: err.Error(),
+			},
+		})
+		return
+	}
+
+	firstName := ctx.Query("first_name")
+	lastName := ctx.Query("last_name")
+	username := ctx.Query("username")
+
+	if firstName != "" && lastName != "" {
+		profile, err := h.uc.GlobalSearchPeople(ctx, firstName, lastName)
+		if err != nil {
+			if errors.Is(err, entity.ErrUserNotFound) {
+				ctx.JSON(http.StatusNotFound, entity.ErrorResponse{
+					Error: entity.ErrorDetail{
+						Code:    "USER_NOT_FOUND",
+						Message: err.Error(),
+					},
+				})
+				return
+			}
+
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, entity.ErrorResponse{
+				Error: entity.ErrorDetail{
+					Code:    "INTERNAL_ERROR",
+					Message: err.Error(),
+				},
+			})
+			return
+		}
+
+		ctx.JSON(http.StatusOK, profile)
+	}
+
+	if username != "" {
+		userID, err := h.uc.GetUserIDByUsername(ctx, username)
+		if err != nil {
+			if errors.Is(err, entity.ErrUserNotFound) {
+				ctx.JSON(http.StatusNotFound, entity.ErrorResponse{
+					Error: entity.ErrorDetail{
+						Code:    "USER_NOT_FOUND",
+						Message: err.Error(),
+					},
+				})
+				return
+			}
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, entity.ErrorResponse{
+				Error: entity.ErrorDetail{
+					Code:    "INTERNAL_ERROR",
+					Message: err.Error(),
+				},
+			})
+			return
+		}
+
+		validUserID, err := uuid.Parse(userID)
+		if err != nil {
+			h.log.Warn("GetSubsUser: invalid userID format", zap.String("userID", userID), zap.Error(err))
+			ctx.JSON(http.StatusBadRequest, entity.ErrorResponse{
+				Error: entity.ErrorDetail{
+					Code:    "INVALID_REQUEST",
+					Message: "invalid userID format",
+				},
+			})
+			return
+		}
+
+		profile, err := h.uc.GetUserProfileByID(ctx, yourUserJWTID, validUserID)
+		if err != nil {
+			if errors.Is(err, entity.ErrUserNotFound) {
+				ctx.JSON(http.StatusNotFound, entity.ErrorResponse{
+					Error: entity.ErrorDetail{
+						Code:    "USER_NOT_FOUND",
+						Message: err.Error(),
+					},
+				})
+				return
+			}
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, entity.ErrorResponse{
+				Error: entity.ErrorDetail{
+					Code:    "INTERNAL_ERROR",
+					Message: err.Error(),
+				},
+			})
+			return
+		}
+
+		ctx.JSON(http.StatusOK, profile)
+	}
 }

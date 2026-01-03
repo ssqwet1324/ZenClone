@@ -157,15 +157,18 @@ function updateNavbar(isAuthenticated) {
     const loginBtn = document.getElementById('loginBtn');
     const logoutBtn = document.getElementById('logoutBtn');
     const profileBtn = document.getElementById('profileBtn');
+    const navSearchContainer = document.getElementById('navSearchContainer');
 
     if (isAuthenticated) {
         if (loginBtn) loginBtn.style.display = 'none';
         if (logoutBtn) logoutBtn.style.display = 'block';
         if (profileBtn) profileBtn.style.display = 'block';
+        if (navSearchContainer) navSearchContainer.style.display = 'block';
     } else {
         if (loginBtn) loginBtn.style.display = 'block';
         if (logoutBtn) logoutBtn.style.display = 'none';
         if (profileBtn) profileBtn.style.display = 'none';
+        if (navSearchContainer) navSearchContainer.style.display = 'none';
     }
 }
 

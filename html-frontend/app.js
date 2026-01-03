@@ -84,6 +84,26 @@ function initEventListeners() {
         if (loginTab) loginTab.addEventListener('click', () => switchAuthTab('login'));
         if (registerTab) registerTab.addEventListener('click', () => switchAuthTab('register'));
 
+        // Поиск
+        const searchBtn = document.getElementById('searchBtn');
+        const searchInput = document.getElementById('searchInput');
+        
+        if (searchBtn) {
+            searchBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                handleSearch();
+            });
+        }
+        
+        if (searchInput) {
+            searchInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleSearch();
+                }
+            });
+        }
+
         // Формы
         const loginForm = document.getElementById('loginForm');
         const registerForm = document.getElementById('registerForm');

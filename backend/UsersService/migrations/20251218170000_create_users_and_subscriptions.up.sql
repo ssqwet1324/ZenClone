@@ -20,3 +20,6 @@ CREATE TABLE IF NOT EXISTS subscriptions (
 );
 
 CREATE INDEX idx_subscriptions_following ON subscriptions(following_id);
+
+CREATE INDEX idx_users_name_search ON users (first_name, last_name);
+

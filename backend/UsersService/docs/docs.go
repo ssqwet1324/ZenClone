@@ -530,6 +530,80 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/users/search": {
+            "get": {
+                "description": "Поиск пользователей по имени+фамилии ИЛИ по username",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Пользователи"
+                ],
+                "summary": "Глобальный поиск пользователей",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer JWT токен",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Имя пользователя",
+                        "name": "first_name",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Фамилия пользователя",
+                        "name": "last_name",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Username пользователя",
+                        "name": "username",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Список найденных пользователей",
+                        "schema": {
+                            "$ref": "#/definitions/entity.PersonDateList"
+                        }
+                    },
+                    "400": {
+                        "description": "Неверные параметры запроса",
+                        "schema": {
+                            "$ref": "#/definitions/entity.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Не авторизован",
+                        "schema": {
+                            "$ref": "#/definitions/entity.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Пользователь не найден",
+                        "schema": {
+                            "$ref": "#/definitions/entity.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "$ref": "#/definitions/entity.ErrorResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -608,6 +682,34 @@ const docTemplate = `{
                 }
             }
         },
+        "entity.PersonDate": {
+            "type": "object",
+            "properties": {
+                "last_name": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "user_avatar_url": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "entity.PersonDateList": {
+            "type": "object",
+            "properties": {
+                "persons": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/entity.PersonDate"
+                    }
+                }
+            }
+        },
         "entity.ProfileUserInfoResponse": {
             "type": "object",
             "properties": {
@@ -638,6 +740,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "last_name": {
+                    "type": "string"
+                },
+                "user_avatar_url": {
                     "type": "string"
                 },
                 "username": {

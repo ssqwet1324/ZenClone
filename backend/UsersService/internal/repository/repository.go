@@ -294,11 +294,11 @@ func (repo *PostgresRepository) SubscribeFromUser(ctx context.Context, followerI
 }
 
 // GetSubsUser - получить подписки пользователя
-func (repo *PostgresRepository) GetSubsUser(ctx context.Context, userID uuid.UUID) (*entity.SubsList, error) {
+func (repo *PostgresRepository) GetSubsUser(ctx context.Context, userID uuid.UUID, bucketName string) (*entity.SubsList, error) {
 	var subList entity.SubsList
 
 	rows, err := repo.db.Query(ctx, `
-		SELECT users.id, users.username, users.first_name, users.last_name
+		SELECT users.id, users.username, users.first_name, users.last_name, users.avatar_url
 		FROM subscriptions
 		JOIN users ON subscriptions.following_id = users.id
 		WHERE subscriptions.follower_id = $1
@@ -310,9 +310,11 @@ func (repo *PostgresRepository) GetSubsUser(ctx context.Context, userID uuid.UUI
 
 	for rows.Next() {
 		var sub entity.SubUserInfo
-		if err := rows.Scan(&sub.ID, &sub.Username, &sub.FirstName, &sub.LastName); err != nil {
+		var avatarURL string
+		if err := rows.Scan(&sub.ID, &sub.Username, &sub.FirstName, &sub.LastName, &avatarURL); err != nil {
 			return nil, fmt.Errorf("GetSubsUser: error scanning row: %w", err)
 		}
+		sub.UserAvatarUrl = repo.buildAvatarURL(bucketName, avatarURL)
 		subList.Subs = append(subList.Subs, sub)
 	}
 
@@ -351,4 +353,31 @@ func (repo *PostgresRepository) CheckSubscription(ctx context.Context, followerI
 	}
 
 	return true, nil
+}
+
+// GlobalSearchPeople - глобальный поиск людей по имени фамилии
+func (repo *PostgresRepository) GlobalSearchPeople(ctx context.Context, firstName, lastName string, bucketName string) (*entity.PersonDateList, error) {
+	var peopleList entity.PersonDateList
+
+	rows, err := repo.db.Query(ctx, `SELECT first_name, last_name, username, avatar_url FROM users WHERE first_name = $1 AND last_name = $2`, firstName, lastName)
+	if err != nil {
+		return nil, fmt.Errorf("GlobalSearchPeople: error executing query: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var people entity.PersonDate
+		var avatarURL string
+		if err := rows.Scan(&people.Name, &people.LastName, &people.Username, &avatarURL); err != nil {
+			return nil, fmt.Errorf("GlobalSearchPeople: error scanning row: %w", err)
+		}
+		people.UserAvatarUrl = repo.buildAvatarURL(bucketName, avatarURL)
+		peopleList.Persons = append(peopleList.Persons, people)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("GlobalSearchPeople: rows iteration error: %w", err)
+	}
+
+	return &peopleList, nil
 }

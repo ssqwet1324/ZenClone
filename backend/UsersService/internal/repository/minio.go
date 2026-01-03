@@ -14,6 +14,20 @@ const (
 	defaultAvatar = "defaultFoto/default.jpg"
 )
 
+// buildAvatarURL - формирует URL аватара из objectName
+func (repo *PostgresRepository) buildAvatarURL(bucketName string, objectName string) string {
+	publicEndpoint := repo.config.MinIoPublicEndpoint
+	if publicEndpoint == "" {
+		publicEndpoint = repo.config.MinioEndpoint
+	}
+
+	if objectName == "default" {
+		return fmt.Sprintf("%s/%s/%s", publicEndpoint, bucketName, defaultAvatar)
+	}
+
+	return fmt.Sprintf("%s/%s/%s", publicEndpoint, bucketName, objectName)
+}
+
 // UploadAvatar - загружаем фото и сохраняем его имя в бд
 func (repo *PostgresRepository) UploadAvatar(ctx context.Context, userID uuid.UUID, bucketName string, avatarInfo entity.AvatarRequest) error {
 	// timestamp, чтобы ссылка менялась при каждой загрузке

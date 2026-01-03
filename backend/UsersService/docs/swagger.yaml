@@ -48,6 +48,24 @@ definitions:
       error:
         $ref: '#/definitions/entity.ErrorDetail'
     type: object
+  entity.PersonDate:
+    properties:
+      last_name:
+        type: string
+      name:
+        type: string
+      user_avatar_url:
+        type: string
+      username:
+        type: string
+    type: object
+  entity.PersonDateList:
+    properties:
+      persons:
+        items:
+          $ref: '#/definitions/entity.PersonDate'
+        type: array
+    type: object
   entity.ProfileUserInfoResponse:
     properties:
       bio:
@@ -68,6 +86,8 @@ definitions:
       id:
         type: string
       last_name:
+        type: string
+      user_avatar_url:
         type: string
       username:
         type: string
@@ -482,4 +502,53 @@ paths:
       summary: Обновление refresh токена
       tags:
       - internal
+  /users/search:
+    get:
+      consumes:
+      - application/json
+      description: Поиск пользователей по имени+фамилии ИЛИ по username
+      parameters:
+      - description: Bearer JWT токен
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Имя пользователя
+        in: query
+        name: first_name
+        type: string
+      - description: Фамилия пользователя
+        in: query
+        name: last_name
+        type: string
+      - description: Username пользователя
+        in: query
+        name: username
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Список найденных пользователей
+          schema:
+            $ref: '#/definitions/entity.PersonDateList'
+        "400":
+          description: Неверные параметры запроса
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "401":
+          description: Не авторизован
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "404":
+          description: Пользователь не найден
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+      summary: Глобальный поиск пользователей
+      tags:
+      - Пользователи
 swagger: "2.0"

@@ -85,17 +85,13 @@ type UpdateUserProfileInfoResponse struct {
 	Bio         *string `json:"bio"`
 }
 
-// UserResponse - ответ user-a
-type UserResponse struct {
-	ID uuid.UUID `json:"id"`
-}
-
 // SubUserInfo - информация о подписчике
 type SubUserInfo struct {
-	ID        uuid.UUID `json:"id"`
-	Username  string    `json:"username"`
-	FirstName string    `json:"first_name"`
-	LastName  string    `json:"last_name"`
+	ID            uuid.UUID `json:"id"`
+	Username      string    `json:"username"`
+	FirstName     string    `json:"first_name"`
+	LastName      string    `json:"last_name"`
+	UserAvatarUrl string    `json:"user_avatar_url"`
 }
 
 // SubsList - подписчики
@@ -150,4 +146,17 @@ type UnsubscribeResponse struct {
 // UploadAvatarResponse - ответ на загрузку аватара
 type UploadAvatarResponse struct {
 	Message string `json:"message"`
+}
+
+// PersonDate - информация о пользвателях которых ищем
+type PersonDate struct {
+	Name          string `json:"name"`
+	LastName      string `json:"last_name"`
+	Username      string `json:"username"`
+	UserAvatarUrl string `json:"user_avatar_url"`
+}
+
+// PersonDateList - список пользователей с похожими именем фамилией
+type PersonDateList struct {
+	Persons []PersonDate `json:"persons"`
 }
