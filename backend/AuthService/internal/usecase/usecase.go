@@ -1,7 +1,7 @@
 package usecase
 
 import (
-	"AuthService/internal/client/UsersClient"
+	"AuthService/internal/client/usersclient"
 	"AuthService/internal/config"
 	"AuthService/internal/entity"
 	"context"
@@ -18,18 +18,22 @@ const (
 	accessTokenTTL = time.Hour
 )
 
+// RepositoryProvider - интерфейс repository
 type RepositoryProvider interface {
 	SaveRefreshToken(ctx context.Context, userID, refreshToken string) error
 	GetRefreshToken(ctx context.Context, userID string) (string, error)
 }
+
+// UseCase - бизнес логика
 type UseCase struct {
 	repo   RepositoryProvider
 	log    *zap.Logger
-	client UsersClient.ClientProvider
+	client usersclient.ClientProvider
 	cfg    *config.Config
 }
 
-func New(repo RepositoryProvider, log *zap.Logger, client UsersClient.ClientProvider, cfg *config.Config) *UseCase {
+// New - конструктор
+func New(repo RepositoryProvider, log *zap.Logger, client usersclient.ClientProvider, cfg *config.Config) *UseCase {
 	return &UseCase{
 		repo:   repo,
 		log:    log,
@@ -65,7 +69,7 @@ func (s *UseCase) GetRefreshToken(ctx context.Context, userID string) (string, e
 	}
 
 	// Если нет в Redis пробуем получить из UsersService
-	token, err := s.client.GetRefreshToken(ctx, UsersClient.TokenRequest{ID: userID})
+	token, err := s.client.GetRefreshToken(ctx, usersclient.TokenRequest{ID: userID})
 	if err != nil || token == "" {
 		s.log.Error("Failed to get refresh token from Redis and UsersService",
 			zap.String("userID", userID),
@@ -162,7 +166,7 @@ func (s *UseCase) RegisterUser(ctx context.Context, reg entity.RegisterRequest) 
 		return "", "", "", entity.ErrHashPassword
 	}
 
-	err = s.client.AddUser(ctx, UsersClient.RegisterRequest{
+	err = s.client.AddUser(ctx, usersclient.RegisterRequest{
 		ID:        userID,
 		Login:     reg.Login,
 		Password:  string(hashedPassword),
@@ -202,7 +206,7 @@ func (s *UseCase) RegisterUser(ctx context.Context, reg entity.RegisterRequest) 
 
 // LoginAccount - входим в аккаунт и отдаем новые токены
 func (s *UseCase) LoginAccount(ctx context.Context, login, password string) (*entity.LoginResponse, error) {
-	response, err := s.client.CompareAuthData(ctx, UsersClient.AuthRequest{
+	response, err := s.client.CompareAuthData(ctx, usersclient.AuthRequest{
 		Login:    login,
 		Password: password,
 	})
@@ -235,7 +239,7 @@ func (s *UseCase) LoginAccount(ctx context.Context, login, password string) (*en
 	}
 
 	// обновляем токен через клиента UpdateRefreshToken
-	var token UsersClient.UpdateRefreshTokenRequest
+	var token usersclient.UpdateRefreshTokenRequest
 
 	token.ID = response.ID
 	token.RefreshToken = newRefreshToken
@@ -280,7 +284,7 @@ func (s *UseCase) RefreshTokens(ctx context.Context, refreshToken, authHeader st
 		// Если не найден — генерируем новый, сохраняем в Redis и обновляем в UsersService
 		newRefreshToken := generateNewRefreshToken()
 		_ = s.SaveRefreshToken(ctx, userID, newRefreshToken)
-		_ = s.client.UpdateRefreshToken(ctx, UsersClient.UpdateRefreshTokenRequest{
+		_ = s.client.UpdateRefreshToken(ctx, usersclient.UpdateRefreshTokenRequest{
 			ID:           userID,
 			RefreshToken: newRefreshToken,
 		})
@@ -303,7 +307,7 @@ func (s *UseCase) RefreshTokens(ctx context.Context, refreshToken, authHeader st
 		)
 		return "", "", entity.ErrSaveRefreshToken
 	}
-	_ = s.client.UpdateRefreshToken(ctx, UsersClient.UpdateRefreshTokenRequest{
+	_ = s.client.UpdateRefreshToken(ctx, usersclient.UpdateRefreshTokenRequest{
 		ID:           userID,
 		RefreshToken: newRefreshToken,
 	})

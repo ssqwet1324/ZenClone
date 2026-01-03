@@ -13,6 +13,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// Run - запуск сервиса
 func Run() {
 	server := gin.Default()
 

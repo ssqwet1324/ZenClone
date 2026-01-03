@@ -1,4 +1,4 @@
-package UsersClient
+package usersclient
 
 import (
 	"AuthService/internal/entity"
@@ -16,6 +16,7 @@ const (
 	updateRefreshToken = "/internal/update-refresh-token"
 )
 
+// ClientProvider - интерфейс авторизации
 type ClientProvider interface {
 	AddUser(ctx context.Context, userData RegisterRequest) error
 	CompareAuthData(ctx context.Context, userData AuthRequest) (*AuthResponse, error)
@@ -26,7 +27,7 @@ type ClientProvider interface {
 // clientService - структура клиента
 type clientService struct {
 	client  *resty.Client
-	baseUrl string
+	baseURL string
 	log     *zap.Logger
 }
 
@@ -38,7 +39,7 @@ func New(client *resty.Client, log *zap.Logger, cfg *ConfigUsersServiceClient) C
 
 	return &clientService{
 		client:  client,
-		baseUrl: cfg.BaseURL,
+		baseURL: cfg.BaseURL,
 		log:     log.Named("AuthClient"),
 	}
 }
@@ -51,7 +52,7 @@ func (c *clientService) AddUser(ctx context.Context, userData RegisterRequest) e
 		SetContext(ctx).
 		SetBody(userData).
 		SetError(&errResp).
-		Post(c.baseUrl + addUser)
+		Post(c.baseURL + addUser)
 
 	if err != nil {
 		c.log.Error("Error adding user", zap.Error(err))
@@ -73,7 +74,7 @@ func (c *clientService) CompareAuthData(ctx context.Context, userData AuthReques
 		SetContext(ctx).
 		SetBody(userData).
 		SetError(&errResp).
-		Post(c.baseUrl + compareAuthData)
+		Post(c.baseURL + compareAuthData)
 
 	if err != nil {
 		c.log.Error("Error comparing auth data", zap.Error(err))
@@ -101,7 +102,7 @@ func (c *clientService) GetRefreshToken(ctx context.Context, token TokenRequest)
 		SetContext(ctx).
 		SetBody(token).
 		SetError(&errResp).
-		Post(c.baseUrl + getRefreshToken)
+		Post(c.baseURL + getRefreshToken)
 
 	if err != nil {
 		return "", entity.ErrInternalServer
@@ -128,7 +129,7 @@ func (c *clientService) UpdateRefreshToken(ctx context.Context, req UpdateRefres
 		SetContext(ctx).
 		SetBody(req).
 		SetError(&errResp).
-		Post(c.baseUrl + updateRefreshToken)
+		Post(c.baseURL + updateRefreshToken)
 
 	if err != nil {
 		c.log.Error("Error updating refresh token", zap.Error(err))

@@ -1,7 +1,7 @@
 package app
 
 import (
-	"AuthService/internal/client/UsersClient"
+	"AuthService/internal/client/usersclient"
 	"AuthService/internal/config"
 	"AuthService/internal/handler"
 	"AuthService/internal/middleware"
@@ -13,6 +13,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// Run - запуск сервиса
 func Run() {
 	server := gin.Default()
 
@@ -27,13 +28,18 @@ func Run() {
 	if err != nil {
 		panic("ErrorDetail init logger: " + err.Error())
 	}
-	defer logger.Sync()
+	defer func(logger *zap.Logger) {
+		err := logger.Sync()
+		if err != nil {
+			panic(err)
+		}
+	}(logger)
 
 	restyClient := resty.New()
 
 	repo := redis.New(cfg.RedisConfig)
 
-	client := UsersClient.New(restyClient, logger, &cfg.ClientConfig)
+	client := usersclient.New(restyClient, logger, &cfg.ClientConfig)
 
 	uc := usecase.New(repo, logger, client, cfg)
 

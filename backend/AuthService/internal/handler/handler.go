@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"AuthService/internal/client/UsersClient"
+	"AuthService/internal/client/usersclient"
 	"AuthService/internal/config"
 	"AuthService/internal/entity"
 	"AuthService/internal/usecase"
@@ -15,12 +15,12 @@ import (
 type AuthHandler struct {
 	uc     *usecase.UseCase
 	log    *zap.Logger
-	client UsersClient.ClientProvider
+	client usersclient.ClientProvider
 	cfg    *config.Config
 }
 
 // New - конструктор ручек
-func New(service *usecase.UseCase, logger *zap.Logger, cfg *config.Config, client UsersClient.ClientProvider) *AuthHandler {
+func New(service *usecase.UseCase, logger *zap.Logger, cfg *config.Config, client usersclient.ClientProvider) *AuthHandler {
 	return &AuthHandler{
 		uc:     service,
 		log:    logger,

@@ -1,4 +1,4 @@
-package UsersClient
+package usersclient
 
 // TokenRequest - запрос для получения токена
 type TokenRequest struct {
@@ -31,7 +31,7 @@ type RegisterRequest struct {
 	FirstName     string `json:"first_name"`
 	LastName      string `json:"last_name"`
 	Bio           string `json:"bio"`
-	UserAvatarUrl string `json:"user_avatar_url"`
+	UserAvatarURL string `json:"user_avatar_url"`
 }
 
 // UpdateRefreshTokenRequest - обновление токенов

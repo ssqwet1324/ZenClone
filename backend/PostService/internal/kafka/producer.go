@@ -8,10 +8,12 @@ import (
 	"github.com/segmentio/kafka-go"
 )
 
+// Producer - продюссер кафки
 type Producer struct {
 	writer *kafka.Writer
 }
 
+// New - контсруктор
 func New(brokers []string, topic string) *Producer {
 	writer := kafka.Writer{
 		Addr:     kafka.TCP(brokers...),

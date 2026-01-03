@@ -15,7 +15,6 @@ const (
 // Repository - кэш
 type Repository struct {
 	client *redis.Client
-	cfg    *Config
 }
 
 // New - конструктор кэша

@@ -10,7 +10,7 @@ import (
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
-	_ "github.com/golang-migrate/migrate/v4/source/file"
+	_ "github.com/golang-migrate/migrate/v4/source/file" // golang-migrate
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -185,7 +185,7 @@ func (repo *PostgresRepository) GetUserProfileByUsername(ctx context.Context, us
 		username).Scan(&userInfoResponse.FirstName,
 		&userInfoResponse.LastName,
 		&userInfoResponse.Bio,
-		&userInfoResponse.UserAvatarUrl)
+		&userInfoResponse.UserAvatarURL)
 
 	if err != nil {
 		return nil, fmt.Errorf("GetUserProfileByUsername: Error getting user information: %v", err)
@@ -202,7 +202,7 @@ func (repo *PostgresRepository) GetUserProfileByID(ctx context.Context, userID u
 		userID).Scan(&userInfoResponse.FirstName,
 		&userInfoResponse.LastName,
 		&userInfoResponse.Bio,
-		&userInfoResponse.UserAvatarUrl)
+		&userInfoResponse.UserAvatarURL)
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -263,16 +263,16 @@ func (repo *PostgresRepository) UpdateUserProfile(ctx context.Context, id uuid.U
 	return nil
 }
 
-// GetUserIdByUsername - получить ID по username
-func (repo *PostgresRepository) GetUserIdByUsername(ctx context.Context, username string) (string, error) {
+// GetUserIDByUsername - получить ID по username
+func (repo *PostgresRepository) GetUserIDByUsername(ctx context.Context, username string) (string, error) {
 	var userIDResponse string
 	err := repo.db.QueryRow(ctx, `SELECT id FROM users WHERE username = $1`, username).Scan(&userIDResponse)
 	if err != nil {
-		return "", fmt.Errorf("GetUserIdByUsername: Error getting user information: %v", err)
+		return "", fmt.Errorf("GetUserIDByUsername: Error getting user information: %v", err)
 	}
 
 	if errors.Is(err, pgx.ErrNoRows) {
-		return "", fmt.Errorf("GetUserIdByUsername: User not found")
+		return "", fmt.Errorf("GetUserIDByUsername: User not found")
 	}
 
 	return userIDResponse, nil
@@ -314,7 +314,7 @@ func (repo *PostgresRepository) GetSubsUser(ctx context.Context, userID uuid.UUI
 		if err := rows.Scan(&sub.ID, &sub.Username, &sub.FirstName, &sub.LastName, &avatarURL); err != nil {
 			return nil, fmt.Errorf("GetSubsUser: error scanning row: %w", err)
 		}
-		sub.UserAvatarUrl = repo.buildAvatarURL(bucketName, avatarURL)
+		sub.UserAvatarURL = repo.buildAvatarURL(bucketName, avatarURL)
 		subList.Subs = append(subList.Subs, sub)
 	}
 
@@ -371,7 +371,7 @@ func (repo *PostgresRepository) GlobalSearchPeople(ctx context.Context, firstNam
 		if err := rows.Scan(&people.Name, &people.LastName, &people.Username, &avatarURL); err != nil {
 			return nil, fmt.Errorf("GlobalSearchPeople: error scanning row: %w", err)
 		}
-		people.UserAvatarUrl = repo.buildAvatarURL(bucketName, avatarURL)
+		people.UserAvatarURL = repo.buildAvatarURL(bucketName, avatarURL)
 		peopleList.Persons = append(peopleList.Persons, people)
 	}
 

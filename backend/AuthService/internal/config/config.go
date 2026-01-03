@@ -1,7 +1,7 @@
 package config
 
 import (
-	"AuthService/internal/client/UsersClient"
+	"AuthService/internal/client/usersclient"
 	"AuthService/internal/repository/redis"
 	"fmt"
 
@@ -12,7 +12,7 @@ import (
 type Config struct {
 	JWTSecret    string `env:"JWT_SECRET"`
 	RedisConfig  redis.Config
-	ClientConfig UsersClient.ConfigUsersServiceClient
+	ClientConfig usersclient.ConfigUsersServiceClient
 	LogLevel     string `env:"LOG_LEVEL"`
 }
 

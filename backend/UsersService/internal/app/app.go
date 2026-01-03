@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// Run - запуск сервиса
 func Run() {
 	server := gin.Default()
 
@@ -51,12 +52,12 @@ func Run() {
 		apiV1.GET("/user/search", userMiddleware, userHandler.GlobalSearchUser)
 	}
 
-	internalApi := server.Group("/internal")
+	internalAPI := server.Group("/internal")
 	{
-		internalApi.POST("/add-user", userHandler.AddUser)
-		internalApi.POST("/compare-auth-data", userHandler.CompareAuthPassword)
-		internalApi.POST("/get-refresh-token", userHandler.GetRefreshToken)
-		internalApi.POST("/update-refresh-token", userHandler.UpdateRefreshToken)
+		internalAPI.POST("/add-user", userHandler.AddUser)
+		internalAPI.POST("/compare-auth-data", userHandler.CompareAuthPassword)
+		internalAPI.POST("/get-refresh-token", userHandler.GetRefreshToken)
+		internalAPI.POST("/update-refresh-token", userHandler.UpdateRefreshToken)
 	}
 
 	if err := server.Run(":8081"); err != nil {

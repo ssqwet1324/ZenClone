@@ -15,11 +15,13 @@ import (
 // Максимальный размер аватарки
 const maxAvatarSize = 50 * 1024 * 1024
 
+// UsersHandler - обработчик ручек
 type UsersHandler struct {
 	uc  *usecase.Usecase
 	log *zap.Logger
 }
 
+// New - конструктор
 func New(uc *usecase.Usecase, log *zap.Logger) *UsersHandler {
 	return &UsersHandler{
 		uc:  uc,

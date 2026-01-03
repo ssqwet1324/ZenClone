@@ -1,4 +1,4 @@
-package UsersClient
+package usersclient
 
 import "time"
 

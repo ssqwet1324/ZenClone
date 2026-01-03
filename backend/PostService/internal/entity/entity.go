@@ -7,11 +7,13 @@ import (
 	"github.com/google/uuid"
 )
 
+// CreatePostRequest  - создание поста
 type CreatePostRequest struct {
 	Title   string `json:"title"`
 	Content string `json:"content"`
 }
 
+// CreatePostResponse - ответ сервиса на создание поста
 type CreatePostResponse struct {
 	ID        uuid.UUID `json:"id"`
 	Title     string    `json:"title"`
@@ -20,18 +22,21 @@ type CreatePostResponse struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// UpdateUserPostRequest - запрос на обновление данных в посте
 type UpdateUserPostRequest struct {
 	Title     *string   `json:"title"`
 	Content   *string   `json:"content"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+// UpdateUserPostResponse - ответ сервиса на обновление данных
 type UpdateUserPostResponse struct {
 	Title     *string   `json:"title"`
 	Content   *string   `json:"content"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+// PostResponse - ответ сервиса для одного поста
 type PostResponse struct {
 	ID        uuid.UUID `json:"id"`
 	Title     string    `json:"title"`
@@ -40,6 +45,7 @@ type PostResponse struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+// PostListResponse  - массив постов
 type PostListResponse struct {
 	Posts      []PostResponse `json:"posts"`
 	NextCursor *PostCursor    `json:"next_cursor"`

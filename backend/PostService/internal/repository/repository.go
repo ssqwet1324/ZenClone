@@ -12,7 +12,7 @@ import (
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
-	_ "github.com/golang-migrate/migrate/v4/source/file"
+	_ "github.com/golang-migrate/migrate/v4/source/file" // golang-migrate
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -25,6 +25,7 @@ const (
 	minConnectionsFromPgx = 5
 )
 
+// PostgresRepository - бд для сервиса с постами
 type PostgresRepository struct {
 	db  *pgxpool.Pool
 	log *zap.Logger
