@@ -4,13 +4,14 @@ import (
 	"UsersService/internal/config"
 	"UsersService/internal/entity"
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
-	_ "github.com/golang-migrate/migrate/v4/source/file" // golang-migrate
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -52,7 +53,12 @@ func Init(ctx context.Context, cfg *config.Config) (*PostgresRepository, error) 
 	}
 
 	sqlDb := stdlib.OpenDB(*pool.Config().ConnConfig)
-	defer sqlDb.Close()
+	defer func(sqlDb *sql.DB) {
+		err := sqlDb.Close()
+		if err != nil {
+			_ = fmt.Errorf("close db error: %w", err)
+		}
+	}(sqlDb)
 
 	driver, err := postgres.WithInstance(sqlDb, &postgres.Config{})
 	if err != nil {
@@ -185,7 +191,7 @@ func (repo *PostgresRepository) GetUserProfileByUsername(ctx context.Context, us
 		username).Scan(&userInfoResponse.FirstName,
 		&userInfoResponse.LastName,
 		&userInfoResponse.Bio,
-		&userInfoResponse.UserAvatarURL)
+		&userInfoResponse.UserAvatarUrl)
 
 	if err != nil {
 		return nil, fmt.Errorf("GetUserProfileByUsername: Error getting user information: %v", err)
@@ -202,7 +208,7 @@ func (repo *PostgresRepository) GetUserProfileByID(ctx context.Context, userID u
 		userID).Scan(&userInfoResponse.FirstName,
 		&userInfoResponse.LastName,
 		&userInfoResponse.Bio,
-		&userInfoResponse.UserAvatarURL)
+		&userInfoResponse.UserAvatarUrl)
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -263,16 +269,16 @@ func (repo *PostgresRepository) UpdateUserProfile(ctx context.Context, id uuid.U
 	return nil
 }
 
-// GetUserIDByUsername - получить ID по username
-func (repo *PostgresRepository) GetUserIDByUsername(ctx context.Context, username string) (string, error) {
+// GetUserIdByUsername - получить ID по username
+func (repo *PostgresRepository) GetUserIdByUsername(ctx context.Context, username string) (string, error) {
 	var userIDResponse string
 	err := repo.db.QueryRow(ctx, `SELECT id FROM users WHERE username = $1`, username).Scan(&userIDResponse)
 	if err != nil {
-		return "", fmt.Errorf("GetUserIDByUsername: Error getting user information: %v", err)
+		return "", fmt.Errorf("GetUserIdByUsername: Error getting user information: %v", err)
 	}
 
 	if errors.Is(err, pgx.ErrNoRows) {
-		return "", fmt.Errorf("GetUserIDByUsername: User not found")
+		return "", fmt.Errorf("GetUserIdByUsername: User not found")
 	}
 
 	return userIDResponse, nil
@@ -314,7 +320,7 @@ func (repo *PostgresRepository) GetSubsUser(ctx context.Context, userID uuid.UUI
 		if err := rows.Scan(&sub.ID, &sub.Username, &sub.FirstName, &sub.LastName, &avatarURL); err != nil {
 			return nil, fmt.Errorf("GetSubsUser: error scanning row: %w", err)
 		}
-		sub.UserAvatarURL = repo.buildAvatarURL(bucketName, avatarURL)
+		sub.UserAvatarUrl = repo.buildAvatarURL(bucketName, avatarURL)
 		subList.Subs = append(subList.Subs, sub)
 	}
 
@@ -371,7 +377,7 @@ func (repo *PostgresRepository) GlobalSearchPeople(ctx context.Context, firstNam
 		if err := rows.Scan(&people.Name, &people.LastName, &people.Username, &avatarURL); err != nil {
 			return nil, fmt.Errorf("GlobalSearchPeople: error scanning row: %w", err)
 		}
-		people.UserAvatarURL = repo.buildAvatarURL(bucketName, avatarURL)
+		people.UserAvatarUrl = repo.buildAvatarURL(bucketName, avatarURL)
 		peopleList.Persons = append(peopleList.Persons, people)
 	}
 

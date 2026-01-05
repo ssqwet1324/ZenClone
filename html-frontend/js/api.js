@@ -34,7 +34,40 @@ async function apiRequest(url, options = {}) {
                     return await retryResponse.json();
                 }
             }
-            throw new Error(data.error?.message || 'Ошибка запроса');
+            // Обработка ошибок валидации (массив) и обычных ошибок (объект)
+            let errorMessage = 'Ошибка запроса';
+            if (data.error) {
+                if (Array.isArray(data.error)) {
+                    // ErrorResponseValidation - массив ошибок валидации
+                    // Маппинг имен полей на русские названия (для регистрации и логина)
+                    const fieldNames = {
+                        'login': 'Логин',
+                        'password': 'Пароль',
+                        'username': 'Имя пользователя',
+                        'first_name': 'Имя',
+                        'last_name': 'Фамилия',
+                        'bio': 'О себе'
+                    };
+                    
+                    if (url.includes('/register') || url.includes('/login')) {
+                        // Для регистрации и логина показываем имя поля при ошибках валидации
+                        errorMessage = data.error.map(err => {
+                            const fieldName = fieldNames[err.code] || err.code;
+                            return `${fieldName}: ${err.message || err.code}`;
+                        }).join(', ');
+                    } else {
+                        // Для других запросов просто объединяем сообщения
+                        errorMessage = data.error.map(err => err.message || err.code).join(', ');
+                    }
+                } else if (data.error.message) {
+                    // ErrorResponse - объект с message (например, INVALID_CREDENTIALS)
+                    // Не показываем имя поля для ошибок аутентификации
+                    errorMessage = data.error.message;
+                } else if (data.error.code) {
+                    errorMessage = data.error.code;
+                }
+            }
+            throw new Error(errorMessage);
         }
 
         return data;

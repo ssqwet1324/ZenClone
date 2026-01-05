@@ -17,7 +17,7 @@ type UserRepo interface {
 	GetUserProfileByUsername(ctx context.Context, username string) (*entity.ProfileUserInfoResponse, error)
 	GetUserProfileByID(ctx context.Context, userID uuid.UUID) (*entity.ProfileUserInfoResponse, error)
 	UpdateUserProfile(ctx context.Context, id uuid.UUID, updateProfileInfo entity.UpdateUserProfileInfoRequest) error
-	GetUserIDByUsername(ctx context.Context, username string) (string, error)
+	GetUserIdByUsername(ctx context.Context, username string) (string, error)
 	CheckUser(ctx context.Context, username string) (bool, error)
 	GetLoginByUserID(ctx context.Context, id uuid.UUID) (string, error)
 	GlobalSearchPeople(ctx context.Context, firstName, lastName string, bucketName string) (*entity.PersonDateList, error)
@@ -158,7 +158,7 @@ func (s *Usecase) GetUserProfileByID(ctx context.Context, yourUserID uuid.UUID, 
 		FirstName:     userInfo.FirstName,
 		LastName:      userInfo.LastName,
 		Bio:           userInfo.Bio,
-		UserAvatarURL: avatarURL,
+		UserAvatarUrl: avatarURL,
 		IsSubscribed:  isSubscribed,
 	}, nil
 }
@@ -218,7 +218,7 @@ func (s *Usecase) UpdateUserProfile(ctx context.Context, id uuid.UUID, updatePro
 
 // GetUserIDByUsername - получить id пользователя по username
 func (s *Usecase) GetUserIDByUsername(ctx context.Context, username string) (string, error) {
-	userID, err := s.repo.GetUserIDByUsername(ctx, username)
+	userID, err := s.repo.GetUserIdByUsername(ctx, username)
 	if err != nil {
 		s.log.Error("GetUserIDByUsername: failed to get user info by username", zap.String("username", username), zap.Error(err))
 		return "", entity.ErrInternalServer

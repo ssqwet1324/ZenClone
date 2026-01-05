@@ -62,7 +62,7 @@ type ProfileUserInfoResponse struct {
 	FirstName     string `json:"first_name"`
 	LastName      string `json:"last_name"`
 	Bio           string `json:"bio"`
-	UserAvatarURL string `json:"user_avatar_url"`
+	UserAvatarUrl string `json:"user_avatar_url"`
 	IsSubscribed  bool   `json:"is_subscribed"`
 }
 
@@ -91,7 +91,7 @@ type SubUserInfo struct {
 	Username      string    `json:"username"`
 	FirstName     string    `json:"first_name"`
 	LastName      string    `json:"last_name"`
-	UserAvatarURL string    `json:"user_avatar_url"`
+	UserAvatarUrl string    `json:"user_avatar_url"`
 }
 
 // SubsList - подписчики
@@ -153,7 +153,7 @@ type PersonDate struct {
 	Name          string `json:"name"`
 	LastName      string `json:"last_name"`
 	Username      string `json:"username"`
-	UserAvatarURL string `json:"user_avatar_url"`
+	UserAvatarUrl string `json:"user_avatar_url"`
 }
 
 // PersonDateList - список пользователей с похожими именем фамилией

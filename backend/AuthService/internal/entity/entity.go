@@ -8,18 +8,18 @@ import (
 
 // LoginUserInfo - данные для входа пользователя
 type LoginUserInfo struct {
-	Login    string `json:"login"`
-	Password string `json:"password"`
+	Login    string `json:"login" validate:"required,min=3,max=16,alphanum"`
+	Password string `json:"password" validate:"required,min=8,passwordregex8,has1letters"`
 }
 
 // RegisterRequest - данные для регистрации нового пользователя
 type RegisterRequest struct {
-	Login     string `json:"login"`
-	Password  string `json:"password"`
-	Username  string `json:"username"`
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
-	Bio       string `json:"bio"`
+	Login     string `json:"login" validate:"required,min=3,max=16,alphanum"`
+	Password  string `json:"password" validate:"required,min=8,passwordregex8,has1letters"`
+	Username  string `json:"username" validate:"required,min=4,max=16,alphanum,has4enletters"`
+	FirstName string `json:"first_name" validate:"required,min=2,max=32,has2letters"`
+	LastName  string `json:"last_name" validate:"required,min=2,max=32,has2letters"`
+	Bio       string `json:"bio" validate:"omitempty,max=500"`
 }
 
 // RegisterResponse - ответ сервиса на регистрацию
@@ -55,6 +55,11 @@ type TokenRequest struct {
 // ErrorResponse - стандартная структура ошибки от UsersService
 type ErrorResponse struct {
 	ErrorDetail ErrorDetail `json:"error"`
+}
+
+// ErrorResponseValidation - ответ ошибки при валидации
+type ErrorResponseValidation struct {
+	ErrorDetail []ErrorDetail `json:"error"`
 }
 
 // ErrorDetail - подробности ошибки

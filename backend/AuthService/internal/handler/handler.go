@@ -4,28 +4,50 @@ import (
 	"AuthService/internal/client/usersclient"
 	"AuthService/internal/config"
 	"AuthService/internal/entity"
+	"AuthService/internal/pkg"
 	"AuthService/internal/usecase"
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 	"go.uber.org/zap"
 )
 
 // AuthHandler - обработчик аутентификации
 type AuthHandler struct {
-	uc     *usecase.UseCase
-	log    *zap.Logger
-	client usersclient.ClientProvider
-	cfg    *config.Config
+	uc        *usecase.UseCase
+	log       *zap.Logger
+	client    usersclient.ClientProvider
+	cfg       *config.Config
+	validator *validator.Validate
 }
 
 // New - конструктор ручек
 func New(service *usecase.UseCase, logger *zap.Logger, cfg *config.Config, client usersclient.ClientProvider) *AuthHandler {
+	valid := validator.New(validator.WithRequiredStructEnabled())
+	if err := valid.RegisterValidation("has4enletters", pkg.Has4EnLetters); err != nil {
+		logger.Fatal("Failed to register has4enletters", zap.Error(err))
+	}
+	if err := valid.RegisterValidation("has3letters", pkg.Has3Letters); err != nil {
+		logger.Fatal("Failed to register has3letters", zap.Error(err))
+	}
+	if err := valid.RegisterValidation("has2letters", pkg.Has2Letters); err != nil {
+		logger.Fatal("Failed to register has2letters", zap.Error(err))
+	}
+	if err := valid.RegisterValidation("has1letters", pkg.Has1Letters); err != nil {
+		logger.Fatal("Failed to register has1letters validator", zap.Error(err))
+	}
+	if err := valid.RegisterValidation("passwordregex8", pkg.PasswordRegex8); err != nil {
+		logger.Fatal("Failed to register passwordregex8 validator", zap.Error(err))
+	}
+
 	return &AuthHandler{
-		uc:     service,
-		log:    logger,
-		cfg:    cfg,
-		client: client,
+		uc:        service,
+		log:       logger,
+		cfg:       cfg,
+		client:    client,
+		validator: valid,
 	}
 }
 
@@ -49,7 +71,34 @@ func (h *AuthHandler) Register(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, entity.ErrorResponse{
 			ErrorDetail: entity.ErrorDetail{
 				Code:    "INVALID_REQUEST",
-				Message: entity.ErrInternalServer.Error(),
+				Message: "Invalid JSON body",
+			},
+		})
+		return
+	}
+
+	// валидация данных
+	var ve validator.ValidationErrors
+
+	if err := h.validator.StructCtx(ctx, &user); err != nil {
+		h.log.Warn("Register: validation failed", zap.Error(err))
+		if errors.As(err, &ve) {
+			validationErrors := make([]entity.ErrorDetail, len(ve))
+			for i, e := range ve {
+				validationErrors[i] = entity.ErrorDetail{
+					Code:    e.Field(),
+					Message: pkg.ValidationErrorToMessage(e),
+				}
+			}
+			ctx.JSON(http.StatusBadRequest, entity.ErrorResponseValidation{
+				ErrorDetail: validationErrors,
+			})
+			return
+		}
+		ctx.JSON(http.StatusBadRequest, entity.ErrorResponse{
+			ErrorDetail: entity.ErrorDetail{
+				Code:    "VALIDATION_FAILED",
+				Message: "Validation failed",
 			},
 		})
 		return
@@ -90,7 +139,7 @@ func (h *AuthHandler) Refresh(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, entity.ErrorResponse{
 			ErrorDetail: entity.ErrorDetail{
 				Code:    "INVALID_REQUEST",
-				Message: entity.ErrInternalServer.Error(),
+				Message: err.Error(),
 			},
 		})
 		return
@@ -148,7 +197,33 @@ func (h *AuthHandler) Login(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, entity.ErrorResponse{
 			ErrorDetail: entity.ErrorDetail{
 				Code:    "INVALID_REQUEST",
-				Message: entity.ErrInternalServer.Error(),
+				Message: "Invalid JSON body",
+			},
+		})
+		return
+	}
+
+	var ve validator.ValidationErrors
+
+	if err := h.validator.StructCtx(ctx, &user); err != nil {
+		h.log.Warn("Login: validation failed", zap.Error(err))
+		if errors.As(err, &ve) {
+			validationErrors := make([]entity.ErrorDetail, len(ve))
+			for i, e := range ve {
+				validationErrors[i] = entity.ErrorDetail{
+					Code:    e.Field(),
+					Message: pkg.ValidationErrorToMessage(e),
+				}
+			}
+			ctx.JSON(http.StatusBadRequest, entity.ErrorResponseValidation{
+				ErrorDetail: validationErrors,
+			})
+			return
+		}
+		ctx.JSON(http.StatusBadRequest, entity.ErrorResponse{
+			ErrorDetail: entity.ErrorDetail{
+				Code:    "VALIDATION_FAILED",
+				Message: "Validation failed",
 			},
 		})
 		return

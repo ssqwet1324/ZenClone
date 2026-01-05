@@ -15,13 +15,11 @@ import (
 	"go.uber.org/zap"
 )
 
-// PostHandler - обработчик ручек для постов
 type PostHandler struct {
 	uc  *usecase.PostUseCase
 	log *zap.Logger
 }
 
-// New - конструктор для ручек
 func New(uc *usecase.PostUseCase, log *zap.Logger) *PostHandler {
 	return &PostHandler{
 		uc:  uc,
