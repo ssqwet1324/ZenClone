@@ -17,14 +17,14 @@ const docTemplate = `{
     "paths": {
         "/api/v1/posts/by-user/{userID}": {
             "get": {
-                "description": "Возвращает список всех постов указанного пользователя",
+                "description": "Возвращает список постов указанного пользователя с поддержкой cursor-based pagination.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "posts"
                 ],
-                "summary": "Получение постов пользователя",
+                "summary": "Получение постов пользователя с пагинацией",
                 "parameters": [
                     {
                         "type": "string",
@@ -32,17 +32,29 @@ const docTemplate = `{
                         "name": "userID",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Количество постов за один запрос (по умолчанию 20, максимум 50)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Cursor для следующей страницы, формат: created_at|post_id",
+                        "name": "cursor",
+                        "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Список постов получен",
+                        "description": "Список постов успешно получен",
                         "schema": {
                             "$ref": "#/definitions/entity.GetPostsUserSuccessResponse"
                         }
                     },
                     "400": {
-                        "description": "Некорректный userID",
+                        "description": "Некорректный userID или limit",
                         "schema": {
                             "$ref": "#/definitions/entity.ErrorResponse"
                         }
@@ -164,6 +176,76 @@ const docTemplate = `{
                     },
                     "403": {
                         "description": "Пост не принадлежит пользователю",
+                        "schema": {
+                            "$ref": "#/definitions/entity.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "$ref": "#/definitions/entity.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/posts/feed": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Возвращает список постов от пользователей, на которых подписан текущий пользователь, с поддержкой cursor-based pagination. Посты отсортированы по времени создания (от новых к старым).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "posts"
+                ],
+                "summary": "Получение ленты постов подписок",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Username текущего пользователя",
+                        "name": "username",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Количество постов за один запрос (по умолчанию 20, максимум 50)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Cursor для следующей страницы, формат: created_at|post_id",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Лента постов успешно получена",
+                        "schema": {
+                            "$ref": "#/definitions/entity.GetPostsUserSuccessResponseFromFeed"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный username или limit",
+                        "schema": {
+                            "$ref": "#/definitions/entity.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Пользователь не авторизован",
+                        "schema": {
+                            "$ref": "#/definitions/entity.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Посты в ленте не найдены (нет подписок или постов)",
                         "schema": {
                             "$ref": "#/definitions/entity.ErrorResponse"
                         }
@@ -335,10 +417,30 @@ const docTemplate = `{
                 "count": {
                     "type": "integer"
                 },
+                "next_cursor": {
+                    "type": "string"
+                },
                 "posts": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/entity.PostResponse"
+                    }
+                }
+            }
+        },
+        "entity.GetPostsUserResponseDataFromFeed": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "next_cursor": {
+                    "type": "string"
+                },
+                "posts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/entity.PostResponseFromFeed"
                     }
                 }
             }
@@ -354,9 +456,46 @@ const docTemplate = `{
                 }
             }
         },
+        "entity.GetPostsUserSuccessResponseFromFeed": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/entity.GetPostsUserResponseDataFromFeed"
+                }
+            }
+        },
         "entity.PostResponse": {
             "type": "object",
             "properties": {
+                "content": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "entity.PostResponseFromFeed": {
+            "type": "object",
+            "properties": {
+                "author_avatar": {
+                    "type": "string"
+                },
+                "author_id": {
+                    "type": "string"
+                },
+                "author_name": {
+                    "type": "string"
+                },
                 "content": {
                     "type": "string"
                 },

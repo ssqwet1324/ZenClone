@@ -196,7 +196,21 @@ function initEventListeners() {
             });
         }
 
-        // Infinite scroll для постов
+        // Делегирование событий для авторов постов в ленте (переход на профиль)
+        const feedList = document.getElementById('feedList');
+        if (feedList) {
+            feedList.addEventListener('click', (e) => {
+                const authorElement = e.target.closest('.post-author');
+                if (authorElement) {
+                    const username = authorElement.dataset.authorUsername;
+                    if (username) {
+                        showProfile(username);
+                    }
+                }
+            });
+        }
+
+        // Infinite scroll для постов и ленты
         let scrollTimeout;
         let isScrolling = false;
         window.addEventListener('scroll', () => {
@@ -208,20 +222,20 @@ function initEventListeners() {
             scrollTimeout = setTimeout(() => {
                 const profileContainer = document.getElementById('profileContainer');
                 const postsTab = document.getElementById('postsTab');
-                
-                // Проверяем, что мы на странице профиля и видим вкладку постов
-                if (profileContainer && profileContainer.style.display !== 'none' && 
-                    postsTab && postsTab.classList.contains('active')) {
-                    
-                    // Получаем текущий username из state.currentProfile
-                    if (state.currentProfile && state.currentProfile.username) {
-                        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-                        const windowHeight = window.innerHeight;
-                        const documentHeight = document.documentElement.scrollHeight;
-                        
-                        // Загружаем следующие посты, если осталось меньше 300px до конца
-                        if (documentHeight - (scrollTop + windowHeight) < 300) {
+                const feedTab = document.getElementById('feedTab');
+
+                // Проверяем, что мы на странице профиля и видим вкладку постов или ленты
+                if (profileContainer && profileContainer.style.display !== 'none') {
+                    const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+                    const windowHeight = window.innerHeight;
+                    const documentHeight = document.documentElement.scrollHeight;
+
+                    if (documentHeight - (scrollTop + windowHeight) < 300) {
+                        if (postsTab && postsTab.classList.contains('active') &&
+                            state.currentProfile && state.currentProfile.username) {
                             loadMoreUserPosts(state.currentProfile.username);
+                        } else if (feedTab && feedTab.classList.contains('active')) {
+                            loadMoreFeedPosts();
                         }
                     }
                 }

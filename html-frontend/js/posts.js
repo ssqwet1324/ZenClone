@@ -201,7 +201,7 @@ async function loadUserPosts(username, reset = true) {
     }
 }
 
-// Загрузка следующих постов (для прокрутки)
+// Загрузка следующих постов (для прокрутки профиля)
 async function loadMoreUserPosts(username) {
     if (state.postsLoading || !state.postsHasMore) {
         return;
@@ -215,6 +215,160 @@ async function loadMoreUserPosts(username) {
     }
     
     await loadUserPosts(username, false);
+}
+
+// ================= ЛЕНТА ПОДПИСОК =================
+
+// Загрузка постов для ленты (первая загрузка или перезагрузка)
+async function loadFeedPosts(reset = true) {
+    console.log('loadFeedPosts вызвана:', { reset });
+    const feedList = document.getElementById('feedList');
+
+    if (!feedList) {
+        console.error('feedList не найден');
+        return;
+    }
+
+    // Сбрасываем состояние пагинации при первой загрузке
+    if (reset) {
+        state.feedNextCursor = null;
+        state.feedHasMore = true;
+        state.feedLoading = false;
+    }
+
+    // Проверяем, не идет ли уже загрузка
+    if (state.feedLoading) {
+        console.log('Загрузка ленты уже идет, пропускаем');
+        return;
+    }
+
+    // Проверяем, есть ли еще посты для загрузки
+    if (!reset && !state.feedHasMore) {
+        console.log('Больше нет постов в ленте');
+        return;
+    }
+
+    state.feedLoading = true;
+
+    try {
+        const limit = 20;
+        const urlParams = new URLSearchParams();
+        urlParams.set('limit', limit.toString());
+        if (state.feedNextCursor) {
+            urlParams.set('cursor', state.feedNextCursor);
+        }
+        if (state.username) {
+            urlParams.set('username', state.username);
+        }
+        const url = `/api/v1/posts/feed?${urlParams.toString()}`;
+
+        console.log('Запрашиваем посты ленты, cursor:', state.feedNextCursor, 'url:', url);
+        const data = await apiRequest(url);
+
+        const posts = data.data?.posts || [];
+        console.log('Получены посты ленты:', posts.length);
+
+        if (posts.length > 0) {
+            const postsHTML = posts.map(post => {
+                // Аватарка автора
+                const authorAvatar = post.author_avatar || `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='50' height='50'%3E%3Ccircle cx='25' cy='25' r='25' fill='%236366f1'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='white' font-size='20' font-family='Arial'%3E${(post.author_name || 'U').charAt(0).toUpperCase()}%3C/text%3E%3C/svg%3E`;
+                const authorName = post.author_name || 'Неизвестный пользователь';
+                
+                return `
+                <div class="post-card" data-post-id="${post.id}">
+                    <div class="post-author" data-author-username="${escapeHtml(post.author_name || '')}" style="cursor: pointer;">
+                        <img src="${authorAvatar}" 
+                             alt="${escapeHtml(authorName)}" 
+                             class="post-author-avatar"
+                             onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'50\' height=\'50\'%3E%3Ccircle cx=\'25\' cy=\'25\' r=\'25\' fill=\'%236366f1\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' text-anchor=\'middle\' dy=\'.3em\' fill=\'white\' font-size=\'20\' font-family=\'Arial\'%3E${(post.author_name || 'U').charAt(0).toUpperCase()}%3C/text%3E%3C/svg%3E'">
+                        <span class="post-author-name">@${escapeHtml(authorName)}</span>
+                    </div>
+                    <h3>${escapeHtml(post.title)}</h3>
+                    <p>${escapeHtml(post.content)}</p>
+                    <div class="post-meta">
+                        <span>📅 ${new Date(post.created_at).toLocaleString('ru-RU', { 
+                            year: 'numeric', 
+                            month: '2-digit', 
+                            day: '2-digit', 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                        })}</span>
+                        ${post.updated_at && post.updated_at !== post.created_at ? 
+                            `<span>✏️ Обновлено: ${new Date(post.updated_at).toLocaleString('ru-RU', { 
+                                year: 'numeric', 
+                                month: '2-digit', 
+                                day: '2-digit', 
+                                hour: '2-digit', 
+                                minute: '2-digit' 
+                            })}</span>` : ''}
+                    </div>
+                </div>
+            `;
+            }).join('');
+
+            if (reset) {
+                feedList.innerHTML = postsHTML;
+            } else {
+                const loadingIndicator = feedList.querySelector('.posts-loading');
+                if (loadingIndicator) {
+                    loadingIndicator.remove();
+                }
+                feedList.insertAdjacentHTML('beforeend', postsHTML);
+            }
+
+            state.feedNextCursor = data.data?.next_cursor || data.data?.nextCursor || null;
+            state.feedHasMore = !!state.feedNextCursor && state.feedNextCursor !== '';
+
+            const endIndicator = feedList.querySelector('.posts-end');
+            if (endIndicator) {
+                endIndicator.remove();
+            }
+        } else {
+            if (reset) {
+                feedList.innerHTML = '<div class="empty-state"><h3>Нет постов в ленте</h3><p>Подпишитесь на пользователей, чтобы видеть их посты в ленте</p></div>';
+            } else {
+                const loadingIndicator = feedList.querySelector('.posts-loading');
+                if (loadingIndicator) {
+                    loadingIndicator.remove();
+                }
+                if (!feedList.querySelector('.posts-end')) {
+                    feedList.insertAdjacentHTML('beforeend', '<div class="posts-end empty-state"><p>Больше нет постов</p></div>');
+                }
+            }
+            state.feedHasMore = false;
+        }
+    } catch (error) {
+        console.error('Ошибка загрузки ленты:', error);
+        if (reset) {
+            feedList.innerHTML = '<div class="empty-state"><h3>Ошибка загрузки ленты</h3><p>' + escapeHtml(error.message) + '</p></div>';
+        } else {
+            const loadingIndicator = feedList.querySelector('.posts-loading');
+            if (loadingIndicator) {
+                loadingIndicator.remove();
+            }
+            state.feedHasMore = false;
+        }
+    } finally {
+        state.feedLoading = false;
+    }
+}
+
+// Загрузка следующих постов ленты (для прокрутки)
+async function loadMoreFeedPosts() {
+    if (state.feedLoading || !state.feedHasMore) {
+        return;
+    }
+
+    const feedList = document.getElementById('feedList');
+    if (!feedList) {
+        return;
+    }
+
+    if (!feedList.querySelector('.posts-loading')) {
+        feedList.insertAdjacentHTML('beforeend', '<div class="posts-loading empty-state"><p>Загрузка постов...</p></div>');
+    }
+
+    await loadFeedPosts(false);
 }
 
 // Показать модальное окно создания поста

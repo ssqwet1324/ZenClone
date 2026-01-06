@@ -1,6 +1,7 @@
 package app
 
 import (
+	"PostService/internal/client/subsclient"
 	"PostService/internal/config"
 	"PostService/internal/handler"
 	"PostService/internal/kafka"
@@ -10,6 +11,7 @@ import (
 	"context"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-resty/resty/v2"
 	"go.uber.org/zap"
 )
 
@@ -39,7 +41,12 @@ func Run() {
 
 	producer := kafka.New([]string{cfg.KafkaAddr}, cfg.KafkaTopic)
 
-	postService := usecase.New(repo, cfg, producer, logger)
+	// Инициализируем клиента для UsersService (подписок)
+	restyClient := resty.New()
+
+	client := subsclient.New(restyClient, logger, &cfg.ClientConfig)
+
+	postService := usecase.New(repo, cfg, producer, logger, client)
 
 	postHandler := handler.New(postService, logger)
 
@@ -49,6 +56,7 @@ func Run() {
 		apiV1.POST("/update/:postID", userMiddleware, postHandler.UpdatePost)
 		apiV1.DELETE("/delete/:postID", userMiddleware, postHandler.DeletePost)
 		apiV1.GET("/by-user/:userID", postHandler.GetPostsUser)
+		apiV1.GET("/feed", userMiddleware, postHandler.GetPostsFeedFromUser)
 	}
 
 	if err := server.Run(":8082"); err != nil {

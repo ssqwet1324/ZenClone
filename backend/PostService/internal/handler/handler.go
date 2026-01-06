@@ -15,11 +15,13 @@ import (
 	"go.uber.org/zap"
 )
 
+// PostHandler - ручки для постов
 type PostHandler struct {
 	uc  *usecase.PostUseCase
 	log *zap.Logger
 }
 
+// New - конструктор
 func New(uc *usecase.PostUseCase, log *zap.Logger) *PostHandler {
 	return &PostHandler{
 		uc:  uc,
@@ -32,7 +34,7 @@ func getUserUUID(ctx *gin.Context) (uuid.UUID, *entity.ErrorResponse) {
 	userIDRaw, exists := ctx.Get("userID")
 	if !exists {
 		return uuid.Nil, &entity.ErrorResponse{
-			Error: entity.ErrorDetail{
+			ErrorDetail: entity.ErrorDetail{
 				Code:    "UNAUTHORIZED",
 				Message: "userID not found in context",
 			},
@@ -42,7 +44,7 @@ func getUserUUID(ctx *gin.Context) (uuid.UUID, *entity.ErrorResponse) {
 	userIDStr, ok := userIDRaw.(string)
 	if !ok {
 		return uuid.Nil, &entity.ErrorResponse{
-			Error: entity.ErrorDetail{
+			ErrorDetail: entity.ErrorDetail{
 				Code:    "UNAUTHORIZED",
 				Message: "userID has wrong type",
 			},
@@ -52,7 +54,7 @@ func getUserUUID(ctx *gin.Context) (uuid.UUID, *entity.ErrorResponse) {
 	userUUID, err := uuid.Parse(userIDStr)
 	if err != nil {
 		return uuid.Nil, &entity.ErrorResponse{
-			Error: entity.ErrorDetail{
+			ErrorDetail: entity.ErrorDetail{
 				Code:    "INVALID_REQUEST",
 				Message: "invalid userID format",
 			},
@@ -60,6 +62,79 @@ func getUserUUID(ctx *gin.Context) (uuid.UUID, *entity.ErrorResponse) {
 	}
 
 	return userUUID, nil
+}
+
+// getJwtToken - получить jwt
+func getJwtToken(ctx *gin.Context) (string, error) {
+	authHeader := ctx.GetHeader("Authorization")
+	if authHeader == "" {
+		return "", errors.New("authorization header missing")
+	}
+
+	parts := strings.SplitN(authHeader, " ", 2)
+	if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
+		return "", errors.New("invalid authorization format")
+	}
+
+	return parts[1], nil
+}
+
+// parseLimit - парсит limit из query параметра
+func parseLimit(ctx *gin.Context, log *zap.Logger, funcName string) (int, *entity.ErrorResponse) {
+	limit := ctx.Query("limit")
+	constLimit := 20
+	if limit != "" {
+		parsedLimit, err := strconv.Atoi(limit)
+		if err != nil {
+			log.Warn(funcName+": invalid limit format", zap.String("limit", limit))
+			return 0, &entity.ErrorResponse{
+				ErrorDetail: entity.ErrorDetail{
+					Code:    "INVALID_REQUEST",
+					Message: "invalid limit format",
+				},
+			}
+		}
+		constLimit = parsedLimit
+		// Ограничиваем максимальный лимит
+		if constLimit > 50 {
+			constLimit = 50
+		}
+	}
+
+	return constLimit, nil
+}
+
+// parseCursor - парсит cursor из query параметра
+func parseCursor(ctx *gin.Context) *entity.PostCursor {
+	var cursor *entity.PostCursor
+	if cur := ctx.Query("cursor"); cur != "" {
+		parts := strings.Split(cur, "|")
+		if len(parts) == 2 {
+			t, err := time.Parse(time.RFC3339, parts[0])
+			if err == nil {
+				id, err := uuid.Parse(parts[1])
+				if err == nil {
+					cursor = &entity.PostCursor{
+						CreatedAt: t,
+						ID:        id,
+					}
+				}
+			}
+		}
+	}
+
+	return cursor
+}
+
+// formatNextCursor - форматирует nextCursor для ответа
+func formatNextCursor(cursor *entity.PostCursor) string {
+	if cursor == nil {
+		return ""
+	}
+	return fmt.Sprintf("%s|%s",
+		cursor.CreatedAt.Format(time.RFC3339),
+		cursor.ID.String(),
+	)
 }
 
 // CreatePost godoc
@@ -86,7 +161,7 @@ func (h *PostHandler) CreatePost(ctx *gin.Context) {
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		h.log.Warn("CreatePost: failed to bind JSON", zap.Error(err))
 		ctx.JSON(http.StatusBadRequest, entity.ErrorResponse{
-			Error: entity.ErrorDetail{
+			ErrorDetail: entity.ErrorDetail{
 				Code:    "INVALID_REQUEST",
 				Message: "invalid request structure",
 			},
@@ -98,7 +173,7 @@ func (h *PostHandler) CreatePost(ctx *gin.Context) {
 	if err != nil {
 		if errors.Is(err, entity.ErrEmptyTitle) {
 			ctx.JSON(http.StatusBadRequest, entity.ErrorResponse{
-				Error: entity.ErrorDetail{
+				ErrorDetail: entity.ErrorDetail{
 					Code:    "EMPTY_TITLE",
 					Message: entity.ErrEmptyTitle.Error(),
 				},
@@ -108,7 +183,7 @@ func (h *PostHandler) CreatePost(ctx *gin.Context) {
 
 		if errors.Is(err, entity.ErrEmptyContent) {
 			ctx.JSON(http.StatusBadRequest, entity.ErrorResponse{
-				Error: entity.ErrorDetail{
+				ErrorDetail: entity.ErrorDetail{
 					Code:    "EMPTY_CONTENT",
 					Message: entity.ErrEmptyContent.Error(),
 				},
@@ -117,7 +192,7 @@ func (h *PostHandler) CreatePost(ctx *gin.Context) {
 		}
 
 		ctx.JSON(http.StatusInternalServerError, entity.ErrorResponse{
-			Error: entity.ErrorDetail{
+			ErrorDetail: entity.ErrorDetail{
 				Code:    "INTERNAL_ERROR",
 				Message: entity.ErrInternalError.Error(),
 			},
@@ -157,7 +232,7 @@ func (h *PostHandler) UpdatePost(ctx *gin.Context) {
 	if err != nil {
 		h.log.Warn("UpdatePost: invalid postID format", zap.String("postID", ctx.Param("postID")), zap.Error(err))
 		ctx.JSON(http.StatusBadRequest, entity.ErrorResponse{
-			Error: entity.ErrorDetail{
+			ErrorDetail: entity.ErrorDetail{
 				Code:    "INVALID_REQUEST",
 				Message: "invalid postID format",
 			},
@@ -175,7 +250,7 @@ func (h *PostHandler) UpdatePost(ctx *gin.Context) {
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		h.log.Warn("UpdatePost: failed to bind JSON", zap.Error(err))
 		ctx.JSON(http.StatusBadRequest, entity.ErrorResponse{
-			Error: entity.ErrorDetail{
+			ErrorDetail: entity.ErrorDetail{
 				Code:    "INVALID_REQUEST",
 				Message: "invalid request structure",
 			},
@@ -187,7 +262,7 @@ func (h *PostHandler) UpdatePost(ctx *gin.Context) {
 	if err != nil {
 		if errors.Is(err, entity.ErrPostNotOwned) {
 			ctx.JSON(http.StatusForbidden, entity.ErrorResponse{
-				Error: entity.ErrorDetail{
+				ErrorDetail: entity.ErrorDetail{
 					Code:    "POST_NOT_OWNED",
 					Message: entity.ErrPostNotOwned.Error(),
 				},
@@ -197,7 +272,7 @@ func (h *PostHandler) UpdatePost(ctx *gin.Context) {
 
 		if errors.Is(err, entity.ErrEmptyTitle) {
 			ctx.JSON(http.StatusBadRequest, entity.ErrorResponse{
-				Error: entity.ErrorDetail{
+				ErrorDetail: entity.ErrorDetail{
 					Code:    "EMPTY_TITLE",
 					Message: entity.ErrEmptyTitle.Error(),
 				},
@@ -207,7 +282,7 @@ func (h *PostHandler) UpdatePost(ctx *gin.Context) {
 
 		if errors.Is(err, entity.ErrEmptyContent) {
 			ctx.JSON(http.StatusBadRequest, entity.ErrorResponse{
-				Error: entity.ErrorDetail{
+				ErrorDetail: entity.ErrorDetail{
 					Code:    "EMPTY_CONTENT",
 					Message: entity.ErrEmptyContent.Error(),
 				},
@@ -216,7 +291,7 @@ func (h *PostHandler) UpdatePost(ctx *gin.Context) {
 		}
 
 		ctx.JSON(http.StatusInternalServerError, entity.ErrorResponse{
-			Error: entity.ErrorDetail{
+			ErrorDetail: entity.ErrorDetail{
 				Code:    "INTERNAL_ERROR",
 				Message: entity.ErrInternalError.Error(),
 			},
@@ -250,7 +325,7 @@ func (h *PostHandler) DeletePost(ctx *gin.Context) {
 	if err != nil {
 		h.log.Warn("DeletePost: invalid postID format", zap.String("postID", ctx.Param("postID")), zap.Error(err))
 		ctx.JSON(http.StatusBadRequest, entity.ErrorResponse{
-			Error: entity.ErrorDetail{
+			ErrorDetail: entity.ErrorDetail{
 				Code:    "INVALID_REQUEST",
 				Message: "invalid postID format",
 			},
@@ -268,7 +343,7 @@ func (h *PostHandler) DeletePost(ctx *gin.Context) {
 	if err != nil {
 		if errors.Is(err, entity.ErrPostNotOwned) {
 			ctx.JSON(http.StatusForbidden, entity.ErrorResponse{
-				Error: entity.ErrorDetail{
+				ErrorDetail: entity.ErrorDetail{
 					Code:    "POST_NOT_OWNED",
 					Message: entity.ErrPostNotOwned.Error(),
 				},
@@ -277,7 +352,7 @@ func (h *PostHandler) DeletePost(ctx *gin.Context) {
 		}
 
 		ctx.JSON(http.StatusInternalServerError, entity.ErrorResponse{
-			Error: entity.ErrorDetail{
+			ErrorDetail: entity.ErrorDetail{
 				Code:    "INTERNAL_ERROR",
 				Message: entity.ErrInternalError.Error(),
 			},
@@ -311,7 +386,7 @@ func (h *PostHandler) GetPostsUser(ctx *gin.Context) {
 	if err != nil {
 		h.log.Warn("GetPostsUser: invalid userID format", zap.String("userID", ctx.Param("userID")), zap.Error(err))
 		ctx.JSON(http.StatusBadRequest, entity.ErrorResponse{
-			Error: entity.ErrorDetail{
+			ErrorDetail: entity.ErrorDetail{
 				Code:    "INVALID_REQUEST",
 				Message: "invalid userID format",
 			},
@@ -319,50 +394,19 @@ func (h *PostHandler) GetPostsUser(ctx *gin.Context) {
 		return
 	}
 
-	limit := ctx.Query("limit")
-	constLimit := 20
-	if limit != "" {
-		parsedLimit, err := strconv.Atoi(limit)
-		if err != nil {
-			h.log.Warn("GetPostsUser: invalid limit format", zap.String("limit", limit))
-			ctx.JSON(http.StatusBadRequest, entity.ErrorResponse{
-				Error: entity.ErrorDetail{
-					Code:    "INVALID_REQUEST",
-					Message: "invalid limit format",
-				},
-			})
-			return
-		}
-		constLimit = parsedLimit
-		// Ограничиваем максимальный лимит
-		if constLimit > 50 {
-			constLimit = 50
-		}
+	constLimit, errResp := parseLimit(ctx, h.log, "GetPostsUser")
+	if errResp != nil {
+		ctx.JSON(http.StatusBadRequest, errResp)
+		return
 	}
 
-	// формируем параметр для частичной отдачи постов
-	var cursor *entity.PostCursor
-	if cur := ctx.Query("cursor"); cur != "" {
-		parts := strings.Split(cur, "|")
-		if len(parts) == 2 {
-			t, err := time.Parse(time.RFC3339, parts[0])
-			if err == nil {
-				id, err := uuid.Parse(parts[1])
-				if err == nil {
-					cursor = &entity.PostCursor{
-						CreatedAt: t,
-						ID:        id,
-					}
-				}
-			}
-		}
-	}
+	cursor := parseCursor(ctx)
 
 	data, err := h.uc.GetPostsUser(ctx.Request.Context(), userUUID, constLimit, cursor)
 	if err != nil {
 		if errors.Is(err, entity.ErrPostsNotFound) {
 			ctx.JSON(http.StatusNotFound, entity.ErrorResponse{
-				Error: entity.ErrorDetail{
+				ErrorDetail: entity.ErrorDetail{
 					Code:    "POSTS_NOT_FOUND",
 					Message: entity.ErrPostsNotFound.Error(),
 				},
@@ -371,7 +415,7 @@ func (h *PostHandler) GetPostsUser(ctx *gin.Context) {
 		}
 
 		ctx.JSON(http.StatusInternalServerError, entity.ErrorResponse{
-			Error: entity.ErrorDetail{
+			ErrorDetail: entity.ErrorDetail{
 				Code:    "INTERNAL_ERROR",
 				Message: entity.ErrInternalError.Error(),
 			},
@@ -379,18 +423,97 @@ func (h *PostHandler) GetPostsUser(ctx *gin.Context) {
 		return
 	}
 
-	// показыаем с какого поста загружать следующие
-	var nextCursor string
-	if data.NextCursor != nil {
-		nextCursor = fmt.Sprintf("%s|%s",
-			data.NextCursor.CreatedAt.Format(time.RFC3339),
-			data.NextCursor.ID.String(),
-		)
-	}
+	nextCursor := formatNextCursor(data.NextCursor)
 
 	ctx.JSON(http.StatusOK, entity.GetPostsUserSuccessResponse{
 		Message: "Posts retrieved successfully",
 		Data: entity.GetPostsUserResponseData{
+			Posts:      data.Posts,
+			Count:      len(data.Posts),
+			NextCursor: nextCursor,
+		},
+	})
+}
+
+// GetPostsFeedFromUser godoc
+// @Summary Получение ленты постов подписок
+// @Description Возвращает список постов от пользователей, на которых подписан текущий пользователь, с поддержкой cursor-based pagination. Посты отсортированы по времени создания (от новых к старым).
+// @Tags posts
+// @Security BearerAuth
+// @Produce json
+// @Param username query string true "Username текущего пользователя"
+// @Param limit query int false "Количество постов за один запрос (по умолчанию 20, максимум 50)"
+// @Param cursor query string false "Cursor для следующей страницы, формат: created_at|post_id"
+// @Success 200 {object} entity.GetPostsUserSuccessResponseFromFeed "Лента постов успешно получена"
+// @Failure 400 {object} entity.ErrorResponse "Некорректный username или limit"
+// @Failure 401 {object} entity.ErrorResponse "Пользователь не авторизован"
+// @Failure 404 {object} entity.ErrorResponse "Посты в ленте не найдены (нет подписок или постов)"
+// @Failure 500 {object} entity.ErrorResponse "Внутренняя ошибка сервера"
+// @Router /api/v1/posts/feed [get]
+func (h *PostHandler) GetPostsFeedFromUser(ctx *gin.Context) {
+	// id пользователя из JWT
+	userID, errResp := getUserUUID(ctx)
+	if errResp != nil {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, errResp)
+		return
+	}
+
+	accessToken, err := getJwtToken(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusUnauthorized, entity.ErrorResponse{
+			ErrorDetail: entity.ErrorDetail{
+				Code:    "UNAUTHORIZED",
+				Message: err.Error(),
+			},
+		})
+		return
+	}
+
+	// получаем username
+	username := ctx.Query("username")
+	if username == "" {
+		ctx.JSON(http.StatusBadRequest, entity.ErrorResponse{
+			ErrorDetail: entity.ErrorDetail{
+				Code:    "INVALID_REQUEST",
+				Message: "username is required",
+			},
+		})
+		return
+	}
+
+	constLimit, errResp := parseLimit(ctx, h.log, "GetPostsFeedFromUser")
+	if errResp != nil {
+		ctx.JSON(http.StatusBadRequest, errResp)
+		return
+	}
+
+	cursor := parseCursor(ctx)
+
+	data, err := h.uc.GetPostsFromFeed(ctx.Request.Context(), username, userID, accessToken, constLimit, cursor)
+	if err != nil {
+		if errors.Is(err, entity.ErrPostsNotFound) {
+			ctx.JSON(http.StatusNotFound, entity.ErrorResponse{
+				ErrorDetail: entity.ErrorDetail{
+					Code:    "POSTS_NOT_FOUND",
+					Message: "You haven't followed anyone yet",
+				},
+			})
+			return
+		}
+
+		ctx.JSON(http.StatusInternalServerError, entity.ErrorResponse{
+			ErrorDetail: entity.ErrorDetail{
+				Code:    "ERROR",
+				Message: err.Error(),
+			},
+		})
+		return
+	}
+
+	nextCursor := formatNextCursor(data.NextCursor)
+
+	ctx.JSON(http.StatusOK, entity.GetPostsUserSuccessResponseFromFeed{
+		Data: entity.GetPostsUserResponseDataFromFeed{
 			Posts:      data.Posts,
 			Count:      len(data.Posts),
 			NextCursor: nextCursor,
