@@ -55,9 +55,22 @@ definitions:
     properties:
       count:
         type: integer
+      next_cursor:
+        type: string
       posts:
         items:
           $ref: '#/definitions/entity.PostResponse'
+        type: array
+    type: object
+  entity.GetPostsUserResponseDataFromFeed:
+    properties:
+      count:
+        type: integer
+      next_cursor:
+        type: string
+      posts:
+        items:
+          $ref: '#/definitions/entity.PostResponseFromFeed'
         type: array
     type: object
   entity.GetPostsUserSuccessResponse:
@@ -67,8 +80,32 @@ definitions:
       message:
         type: string
     type: object
+  entity.GetPostsUserSuccessResponseFromFeed:
+    properties:
+      data:
+        $ref: '#/definitions/entity.GetPostsUserResponseDataFromFeed'
+    type: object
   entity.PostResponse:
     properties:
+      content:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  entity.PostResponseFromFeed:
+    properties:
+      author_avatar:
+        type: string
+      author_id:
+        type: string
+      author_name:
+        type: string
       content:
         type: string
       created_at:
@@ -110,22 +147,31 @@ info:
 paths:
   /api/v1/posts/by-user/{userID}:
     get:
-      description: Возвращает список всех постов указанного пользователя
+      description: Возвращает список постов указанного пользователя с поддержкой cursor-based
+        pagination.
       parameters:
       - description: ID пользователя
         in: path
         name: userID
         required: true
         type: string
+      - description: Количество постов за один запрос (по умолчанию 20, максимум 50)
+        in: query
+        name: limit
+        type: integer
+      - description: 'Cursor для следующей страницы, формат: created_at|post_id'
+        in: query
+        name: cursor
+        type: string
       produces:
       - application/json
       responses:
         "200":
-          description: Список постов получен
+          description: Список постов успешно получен
           schema:
             $ref: '#/definitions/entity.GetPostsUserSuccessResponse'
         "400":
-          description: Некорректный userID
+          description: Некорректный userID или limit
           schema:
             $ref: '#/definitions/entity.ErrorResponse'
         "404":
@@ -136,7 +182,7 @@ paths:
           description: Внутренняя ошибка сервера
           schema:
             $ref: '#/definitions/entity.ErrorResponse'
-      summary: Получение постов пользователя
+      summary: Получение постов пользователя с пагинацией
       tags:
       - posts
   /api/v1/posts/create:
@@ -210,6 +256,53 @@ paths:
       security:
       - BearerAuth: []
       summary: Удаление поста
+      tags:
+      - posts
+  /api/v1/posts/feed:
+    get:
+      description: Возвращает список постов от пользователей, на которых подписан
+        текущий пользователь, с поддержкой cursor-based pagination. Посты отсортированы
+        по времени создания (от новых к старым).
+      parameters:
+      - description: Username текущего пользователя
+        in: query
+        name: username
+        required: true
+        type: string
+      - description: Количество постов за один запрос (по умолчанию 20, максимум 50)
+        in: query
+        name: limit
+        type: integer
+      - description: 'Cursor для следующей страницы, формат: created_at|post_id'
+        in: query
+        name: cursor
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Лента постов успешно получена
+          schema:
+            $ref: '#/definitions/entity.GetPostsUserSuccessResponseFromFeed'
+        "400":
+          description: Некорректный username или limit
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "401":
+          description: Пользователь не авторизован
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "404":
+          description: Посты в ленте не найдены (нет подписок или постов)
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Получение ленты постов подписок
       tags:
       - posts
   /api/v1/posts/update/{postID}:

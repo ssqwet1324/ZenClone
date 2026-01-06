@@ -7,10 +7,14 @@ const state = {
     refreshToken: null,
     username: null,
     userId: null,
-    // Пагинация постов
+    // Пагинация постов в профиле
     postsNextCursor: null,
     postsLoading: false,
     postsHasMore: true,
-    currentPostsUserId: null
+    currentPostsUserId: null,
+    // Пагинация ленты
+    feedNextCursor: null,
+    feedLoading: false,
+    feedHasMore: true
 };
 

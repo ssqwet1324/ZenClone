@@ -193,7 +193,7 @@ func (repo *PostgresRepository) GetPostsUser(ctx context.Context, authorID uuid.
 	var rows pgx.Rows
 	var err error
 
-	// делаем сначала обынчный запрос на limit, далее уже с cursor
+	// делаем сначала обычный запрос на limit, далее уже с cursor
 	if cursor == nil {
 		rows, err = repo.db.Query(ctx, `SELECT post_id, title, content, created_at, updated_at FROM posts
             WHERE author_id = $1 ORDER BY created_at DESC, post_id DESC LIMIT $2`, authorID, limit)
@@ -224,6 +224,65 @@ func (repo *PostgresRepository) GetPostsUser(ctx context.Context, authorID uuid.
 
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("GetPostsUser: error iterating rows: %v", err)
+	}
+
+	if len(postList.Posts) > 0 {
+		last := postList.Posts[len(postList.Posts)-1]
+		postList.NextCursor = &entity.PostCursor{
+			CreatedAt: last.CreatedAt,
+			ID:        last.ID,
+		}
+	}
+
+	return &postList, nil
+}
+
+// GetPostsFromFeed - получаем посты для ленты
+func (repo *PostgresRepository) GetPostsFromFeed(ctx context.Context, authorIDs []uuid.UUID, limit int, cursor *entity.PostCursor) (*entity.PostListResponseFromFeed, error) {
+	var postList entity.PostListResponseFromFeed
+	var rows pgx.Rows
+	var err error
+
+	if len(authorIDs) == 0 {
+		return &postList, nil
+	}
+
+	if cursor == nil {
+		rows, err = repo.db.Query(ctx, `
+            SELECT post_id, author_id, title, content, created_at, updated_at
+            FROM posts WHERE author_id = ANY($1) ORDER BY created_at DESC, post_id DESC
+            LIMIT $2`, authorIDs, limit)
+	} else {
+		rows, err = repo.db.Query(ctx, `
+            SELECT post_id, author_id, title, content, created_at, updated_at
+            FROM posts
+            WHERE author_id = ANY($1)
+              AND (created_at < $2 OR (created_at = $2 AND post_id < $3))
+            ORDER BY created_at DESC, post_id DESC LIMIT $4`, authorIDs, cursor.CreatedAt, cursor.ID, limit)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("GetPostsFromFeed: error getting posts: %v", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var post entity.PostResponseFromFeed
+		if err := rows.Scan(
+			&post.ID,
+			&post.AuthorID,
+			&post.Title,
+			&post.Content,
+			&post.CreatedAt,
+			&post.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("GetPostsFromFeed: scan error: %w", err)
+		}
+		postList.Posts = append(postList.Posts, post)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("GetPostsFromFeed: error iterating rows: %v", err)
 	}
 
 	if len(postList.Posts) > 0 {

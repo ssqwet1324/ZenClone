@@ -41,7 +41,10 @@ async function showProfile(username) {
         // Загрузка подписок (делаем это первым, чтобы потенциально получить ID из списка)
         await loadSubscriptions(username);
 
-        // Загрузка постов
+        // По умолчанию показываем вкладку "Посты"
+        switchProfileTab('posts');
+
+        // Загрузка постов для профиля
         await loadUserPosts(username);
     } catch (error) {
         console.error('Ошибка загрузки профиля:', error);
@@ -184,8 +187,19 @@ function switchProfileTab(tabName) {
         content.classList.remove('active');
     });
 
-    document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
-    document.getElementById(`${tabName}Tab`).classList.add('active');
+    const tabBtn = document.querySelector(`[data-tab="${tabName}"]`);
+    const tabContent = document.getElementById(`${tabName}Tab`);
+    if (tabBtn) tabBtn.classList.add('active');
+    if (tabContent) tabContent.classList.add('active');
+
+    // Дополнительные действия при переключении вкладок
+    if (tabName === 'posts' && state.currentProfile?.username) {
+        // При возврате на посты можно при необходимости перезагрузить
+        // loadUserPosts(state.currentProfile.username);
+    } else if (tabName === 'feed') {
+        // При открытии ленты грузим её
+        loadFeedPosts(true);
+    }
 }
 
 // Показать модальное окно редактирования профиля
