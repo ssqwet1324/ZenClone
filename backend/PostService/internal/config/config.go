@@ -10,14 +10,15 @@ import (
 
 // Config - кфг
 type Config struct {
-	JWTSecret    string `env:"JWT_SECRET"`
-	DbName       string `env:"DB_NAME"`
-	DbUser       string `env:"DB_USER"`
-	DbPassword   string `env:"DB_PASSWORD"`
-	DbHost       string `env:"DB_HOST"`
-	DbPort       int    `env:"DB_PORT"`
-	KafkaAddr    string `env:"KAFKA_ADDR"`
-	KafkaTopic   string `env:"KAFKA_TOPIC"`
+	JWTSecret  string `env:"JWT_SECRET"`
+	DbName     string `env:"DB_NAME"`
+	DbUser     string `env:"DB_USER"`
+	DbPassword string `env:"DB_PASSWORD"`
+	DbHost     string `env:"DB_HOST"`
+	DbPort     int    `env:"DB_PORT"`
+	KafkaAddr  string `env:"KAFKA_ADDR"`
+	KafkaTopic string `env:"KAFKA_TOPIC"`
+	LogLevel   string `env:"LOG_LEVEL"`
 	ClientConfig subsclient.ConfigUsersServiceClient
 }
 

@@ -23,7 +23,6 @@ services:
       - app-network
     restart: always
 
-
   zookeeper:
     image: confluentinc/cp-zookeeper:latest
     container_name: zookeeper
@@ -85,20 +84,6 @@ services:
       - app-network
     restart: always
 
-  users_service:
-    build:
-      context: UsersService
-    container_name: users_service
-    depends_on:
-      - postgres
-    env_file:
-      - UsersService/.env
-    ports:
-      - "8081:8081"
-    networks:
-      - app-network
-    restart: always
-
   auth_service:
     build:
       context: AuthService
@@ -110,6 +95,20 @@ services:
       - AuthService/.env
     ports:
       - "8080:8080"
+    networks:
+      - app-network
+    restart: always
+
+  users_service:
+    build:
+      context: UsersService
+    container_name: users_service
+    depends_on:
+      - postgres
+    env_file:
+      - UsersService/.env
+    ports:
+      - "8081:8081"
     networks:
       - app-network
     restart: always
@@ -143,6 +142,28 @@ services:
     networks:
       - app-network
     restart: always
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    depends_on:
+      - auth_service
+    networks:
+      - app-network
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - prometheus
+    networks:
+      - app-network
 
 networks:
   app-network:

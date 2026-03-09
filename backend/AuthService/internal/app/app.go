@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-resty/resty/v2"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 )
 
@@ -18,10 +19,11 @@ func Run() {
 	server := gin.Default()
 
 	server.Use(middleware.ServerMiddleware())
+	server.Use(middleware.PrometheusMiddleware())
 
 	cfg, err := config.New()
 	if err != nil {
-		panic("ErrorDetail loading config" + err.Error())
+		panic("Error loading config" + err.Error())
 	}
 
 	logger, err := middleware.InitLogger(cfg.LogLevel)
@@ -29,10 +31,7 @@ func Run() {
 		panic("ErrorDetail init logger: " + err.Error())
 	}
 	defer func(logger *zap.Logger) {
-		err := logger.Sync()
-		if err != nil {
-			panic(err)
-		}
+		_ = logger.Sync()
 	}(logger)
 
 	restyClient := resty.New()
@@ -51,6 +50,9 @@ func Run() {
 		apiV1.POST("/login", authHandler.Login)
 		apiV1.POST("/refresh", authHandler.Refresh)
 	}
+
+	//Metrics
+	server.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	if err := server.Run(":8080"); err != nil {
 		logger.Fatal("ErrorDetail starting usecase", zap.Error(err))

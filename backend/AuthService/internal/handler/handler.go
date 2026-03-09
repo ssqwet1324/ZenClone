@@ -16,7 +16,7 @@ import (
 
 // AuthHandler - обработчик аутентификации
 type AuthHandler struct {
-	uc        *usecase.UseCase
+	uc        usecase.UseCaseInterface
 	log       *zap.Logger
 	client    usersclient.ClientProvider
 	cfg       *config.Config
@@ -24,7 +24,7 @@ type AuthHandler struct {
 }
 
 // New - конструктор ручек
-func New(service *usecase.UseCase, logger *zap.Logger, cfg *config.Config, client usersclient.ClientProvider) *AuthHandler {
+func New(service usecase.UseCaseInterface, logger *zap.Logger, cfg *config.Config, client usersclient.ClientProvider) *AuthHandler {
 	valid := validator.New(validator.WithRequiredStructEnabled())
 	if err := valid.RegisterValidation("has4enletters", pkg.Has4EnLetters); err != nil {
 		logger.Fatal("Failed to register has4enletters", zap.Error(err))
@@ -104,18 +104,20 @@ func (h *AuthHandler) Register(ctx *gin.Context) {
 		return
 	}
 
-	userID, accessToken, refreshToken, err := h.uc.RegisterUser(ctx, user)
+	data, err := h.uc.RegisterUser(ctx, user)
 	if err != nil {
 		h.handleError(ctx, err)
 		return
 	}
 
-	ctx.JSON(http.StatusCreated, entity.RegisterResponse{
-		ID:           userID,
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
+	response := entity.RegisterResponse{
+		ID:           data.ID,
+		AccessToken:  data.AccessToken,
+		RefreshToken: data.RefreshToken,
 		Username:     user.Username,
-	})
+	}
+
+	ctx.JSON(http.StatusCreated, response)
 }
 
 // Refresh godoc
@@ -166,16 +168,18 @@ func (h *AuthHandler) Refresh(ctx *gin.Context) {
 		return
 	}
 
-	newRefreshToken, newAccessToken, err := h.uc.RefreshTokens(ctx, req.RefreshToken, authHeader)
+	data, err := h.uc.RefreshTokens(ctx, req.RefreshToken, authHeader)
 	if err != nil {
 		h.handleError(ctx, err)
 		return
 	}
 
-	ctx.JSON(http.StatusOK, entity.RefreshResponse{
-		RefreshToken: newRefreshToken,
-		AccessToken:  newAccessToken,
-	})
+	response := entity.RefreshResponse{
+		RefreshToken: data.RefreshToken,
+		AccessToken:  data.AccessToken,
+	}
+
+	ctx.JSON(http.StatusOK, response)
 }
 
 // Login godoc

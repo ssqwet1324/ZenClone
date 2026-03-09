@@ -21,6 +21,7 @@ type Config struct {
 	MinioSecretKey      string `env:"MINIO_SECRET_KEY"`
 	MinioUseSSl         bool   `env:"MINIO_USE_SSL"`
 	BucketName          string `env:"BUCKET_NAME"`
+	LogLevel            string `env:"LOG_LEVEL"`
 }
 
 // New - конструктор кфг

@@ -18,15 +18,18 @@ func Run() {
 
 	server.Use(middleware.ServerMiddleware())
 
-	logger, err := zap.NewDevelopment()
-	if err != nil {
-		panic("Error creating zap logger: " + err.Error())
-	}
-
 	cfg, err := config.New()
 	if err != nil {
-		logger.Fatal("can't initialize config", zap.Error(err))
+		panic("Error loading config" + err.Error())
 	}
+
+	logger, err := middleware.InitLogger(cfg.LogLevel)
+	if err != nil {
+		panic("ErrorDetail init logger: " + err.Error())
+	}
+	defer func(logger *zap.Logger) {
+		_ = logger.Sync()
+	}(logger)
 
 	userMiddleware := middleware.JWTAuthMiddleware(cfg)
 
