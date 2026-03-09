@@ -1,0 +1,191 @@
+basePath: /api
+definitions:
+  entity.ErrorDetail:
+    properties:
+      code:
+        type: string
+      message:
+        type: string
+    type: object
+  entity.ErrorResponse:
+    properties:
+      error:
+        $ref: '#/definitions/entity.ErrorDetail'
+    type: object
+  entity.LoginResponse:
+    properties:
+      access_token:
+        type: string
+      id:
+        type: string
+      refresh_token:
+        type: string
+      username:
+        type: string
+    type: object
+  entity.LoginUserInfo:
+    properties:
+      login:
+        type: string
+      password:
+        type: string
+    type: object
+  entity.RefreshResponse:
+    properties:
+      access_token:
+        type: string
+      refresh_token:
+        type: string
+    type: object
+  entity.RegisterRequest:
+    properties:
+      bio:
+        type: string
+      first_name:
+        type: string
+      last_name:
+        type: string
+      login:
+        type: string
+      password:
+        type: string
+      username:
+        type: string
+    type: object
+  entity.RegisterResponse:
+    properties:
+      access_token:
+        type: string
+      id:
+        type: string
+      refresh_token:
+        type: string
+      username:
+        type: string
+    type: object
+  entity.TokenRequest:
+    properties:
+      id:
+        type: string
+      refresh_token:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Сервис аутентификации и регистрации пользователей
+  title: Auth Service API
+  version: "1.0"
+paths:
+  /api/v1/auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Выполняет вход пользователя по логину и паролю и возвращает access
+        и refresh JWT токены
+      parameters:
+      - description: Логин и пароль пользователя
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/entity.LoginUserInfo'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Аутентификация прошла успешно
+          schema:
+            $ref: '#/definitions/entity.LoginResponse'
+        "400":
+          description: Некорректное тело запроса
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "401":
+          description: Неверный логин или пароль
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+      summary: Аутентификация пользователя
+      tags:
+      - auth
+  /api/v1/auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Обновляет access и refresh токены по валидному refresh токену и
+        access токену из заголовка Authorization
+      parameters:
+      - description: Bearer access token
+        example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Refresh токен
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/entity.TokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Токены успешно обновлены
+          schema:
+            $ref: '#/definitions/entity.RefreshResponse'
+        "400":
+          description: Отсутствует refresh token или заголовок Authorization
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "401":
+          description: Токен невалиден или истёк срок действия
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+      summary: Обновление JWT токенов
+      tags:
+      - auth
+  /api/v1/auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Регистрирует нового пользователя, создаёт учётную запись и возвращает
+        access и refresh JWT токены
+      parameters:
+      - description: Данные для регистрации пользователя
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/entity.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Пользователь успешно зарегистрирован
+          schema:
+            $ref: '#/definitions/entity.RegisterResponse'
+        "400":
+          description: Некорректное тело запроса
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "409":
+          description: Пользователь с таким логином уже существует
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+      summary: Регистрация пользователя
+      tags:
+      - auth
+swagger: "2.0"

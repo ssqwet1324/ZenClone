@@ -1,0 +1,554 @@
+basePath: /api
+definitions:
+  entity.AddUserRequest:
+    properties:
+      bio:
+        type: string
+      first_name:
+        type: string
+      id:
+        type: string
+      last_name:
+        type: string
+      login:
+        type: string
+      password:
+        type: string
+      username:
+        type: string
+    type: object
+  entity.AddUserResponse:
+    properties:
+      message:
+        type: string
+    type: object
+  entity.AuthRequest:
+    properties:
+      login:
+        type: string
+      password:
+        type: string
+    type: object
+  entity.CompareAuthPasswordResponse:
+    properties:
+      id:
+        type: string
+      username:
+        type: string
+    type: object
+  entity.ErrorDetail:
+    properties:
+      code:
+        type: string
+      message:
+        type: string
+    type: object
+  entity.ErrorResponse:
+    properties:
+      error:
+        $ref: '#/definitions/entity.ErrorDetail'
+    type: object
+  entity.PersonDate:
+    properties:
+      last_name:
+        type: string
+      name:
+        type: string
+      user_avatar_url:
+        type: string
+      username:
+        type: string
+    type: object
+  entity.PersonDateList:
+    properties:
+      persons:
+        items:
+          $ref: '#/definitions/entity.PersonDate'
+        type: array
+    type: object
+  entity.ProfileUserInfoResponse:
+    properties:
+      bio:
+        type: string
+      first_name:
+        type: string
+      is_subscribed:
+        type: boolean
+      last_name:
+        type: string
+      user_avatar_url:
+        type: string
+    type: object
+  entity.SubUserInfo:
+    properties:
+      first_name:
+        type: string
+      id:
+        type: string
+      last_name:
+        type: string
+      user_avatar_url:
+        type: string
+      username:
+        type: string
+    type: object
+  entity.SubsList:
+    properties:
+      subs:
+        items:
+          $ref: '#/definitions/entity.SubUserInfo'
+        type: array
+    type: object
+  entity.SubscribeResponse:
+    properties:
+      message:
+        type: string
+    type: object
+  entity.TokenRequest:
+    properties:
+      id:
+        type: string
+    type: object
+  entity.TokenResponse:
+    properties:
+      refresh_token:
+        type: string
+    type: object
+  entity.UnsubscribeResponse:
+    properties:
+      message:
+        type: string
+    type: object
+  entity.UpdateRefreshTokenRequest:
+    properties:
+      id:
+        type: string
+      refresh_token:
+        type: string
+    type: object
+  entity.UpdateRefreshTokenResponse:
+    properties:
+      message:
+        type: string
+    type: object
+  entity.UpdateUserProfileInfoRequest:
+    properties:
+      bio:
+        type: string
+      first_name:
+        type: string
+      last_name:
+        type: string
+      password_new:
+        type: string
+      password_old:
+        type: string
+      username:
+        type: string
+    type: object
+  entity.UpdateUserProfileInfoResponse:
+    properties:
+      bio:
+        type: string
+      first_name:
+        type: string
+      last_name:
+        type: string
+      password_new:
+        type: string
+      username:
+        type: string
+    type: object
+  entity.UploadAvatarResponse:
+    properties:
+      message:
+        type: string
+    type: object
+host: localhost:8081
+info:
+  contact: {}
+  description: Сервис управления пользователями
+  title: Users Service API
+  version: "1.0"
+paths:
+  /api/v1/get-user-profile/{username}:
+    get:
+      description: Получает информацию о профиле пользователя по username
+      parameters:
+      - description: Username пользователя
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Профиль пользователя
+          schema:
+            $ref: '#/definitions/entity.ProfileUserInfoResponse'
+        "401":
+          description: Неавторизован
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "404":
+          description: Пользователь не найден
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Получение профиля пользователя
+      tags:
+      - users
+  /api/v1/update-user-info:
+    post:
+      consumes:
+      - application/json
+      description: Обновляет информацию профиля текущего пользователя
+      parameters:
+      - description: Данные для обновления профиля
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/entity.UpdateUserProfileInfoRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Профиль успешно обновлён
+          schema:
+            $ref: '#/definitions/entity.UpdateUserProfileInfoResponse'
+        "400":
+          description: Некорректный запрос
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "401":
+          description: Неверный пароль или неавторизован
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Обновление профиля пользователя
+      tags:
+      - users
+  /api/v1/user/subs/{username}:
+    get:
+      description: Получает список пользователей, на которых подписан пользователь
+      parameters:
+      - description: Username пользователя
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Список подписок
+          schema:
+            $ref: '#/definitions/entity.SubsList'
+        "401":
+          description: Неавторизован
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "404":
+          description: Подписки не найдены
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Получение списка подписок пользователя
+      tags:
+      - users
+  /api/v1/user/subscribe/{username}:
+    post:
+      description: Подписывает текущего пользователя на другого пользователя
+      parameters:
+      - description: Username пользователя
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешная подписка
+          schema:
+            $ref: '#/definitions/entity.SubscribeResponse'
+        "401":
+          description: Неавторизован
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "404":
+          description: Пользователь не найден
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Подписка на пользователя
+      tags:
+      - users
+  /api/v1/user/unsubscribe/{username}:
+    post:
+      description: Отписывает текущего пользователя от другого пользователя
+      parameters:
+      - description: Username пользователя
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешная отписка
+          schema:
+            $ref: '#/definitions/entity.UnsubscribeResponse'
+        "401":
+          description: Неавторизован
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "404":
+          description: Пользователь не найден
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Отписка от пользователя
+      tags:
+      - users
+  /api/v1/user/upload-avatar:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Загружает аватар для текущего пользователя
+      parameters:
+      - description: Файл аватара (до 50MB)
+        in: formData
+        name: avatar
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Аватар успешно загружен
+          schema:
+            $ref: '#/definitions/entity.UploadAvatarResponse'
+        "400":
+          description: Некорректный файл
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "401":
+          description: Неавторизован
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Загрузка аватара пользователя
+      tags:
+      - users
+  /internal/add-user:
+    post:
+      consumes:
+      - application/json
+      description: Создаёт нового пользователя в системе
+      parameters:
+      - description: Данные пользователя
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/entity.AddUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Пользователь успешно создан
+          schema:
+            $ref: '#/definitions/entity.AddUserResponse'
+        "400":
+          description: Некорректный запрос или пользователь уже существует
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+      summary: Создание пользователя
+      tags:
+      - internal
+  /internal/compare-auth-data:
+    post:
+      consumes:
+      - application/json
+      description: Проверяет логин и пароль пользователя
+      parameters:
+      - description: Данные для авторизации
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/entity.AuthRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешная проверка
+          schema:
+            $ref: '#/definitions/entity.CompareAuthPasswordResponse'
+        "400":
+          description: Некорректный запрос
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "401":
+          description: Неверный пароль
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "404":
+          description: Пользователь не найден
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+      summary: Сравнение данных авторизации
+      tags:
+      - internal
+  /internal/get-refresh-token:
+    post:
+      consumes:
+      - application/json
+      description: Получает refresh токен по ID пользователя
+      parameters:
+      - description: ID пользователя
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/entity.TokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Токен успешно получен
+          schema:
+            $ref: '#/definitions/entity.TokenResponse'
+        "400":
+          description: Некорректный запрос
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+      summary: Получение refresh токена
+      tags:
+      - internal
+  /internal/update-refresh-token:
+    post:
+      consumes:
+      - application/json
+      description: Обновляет refresh токен для пользователя
+      parameters:
+      - description: Данные для обновления токена
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/entity.UpdateRefreshTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Токен успешно обновлен
+          schema:
+            $ref: '#/definitions/entity.UpdateRefreshTokenResponse'
+        "400":
+          description: Некорректный запрос
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+      summary: Обновление refresh токена
+      tags:
+      - internal
+  /users/search:
+    get:
+      consumes:
+      - application/json
+      description: Поиск пользователей по имени+фамилии ИЛИ по username
+      parameters:
+      - description: Bearer JWT токен
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Имя пользователя
+        in: query
+        name: first_name
+        type: string
+      - description: Фамилия пользователя
+        in: query
+        name: last_name
+        type: string
+      - description: Username пользователя
+        in: query
+        name: username
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Список найденных пользователей
+          schema:
+            $ref: '#/definitions/entity.PersonDateList'
+        "400":
+          description: Неверные параметры запроса
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "401":
+          description: Не авторизован
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "404":
+          description: Пользователь не найден
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+      summary: Глобальный поиск пользователей
+      tags:
+      - Пользователи
+swagger: "2.0"

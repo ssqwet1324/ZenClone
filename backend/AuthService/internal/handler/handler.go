@@ -1,0 +1,243 @@
+package handler
+
+import (
+	"AuthService/internal/client/usersclient"
+	"AuthService/internal/config"
+	"AuthService/internal/entity"
+	"AuthService/internal/pkg"
+	"AuthService/internal/usecase"
+	"errors"
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
+	"go.uber.org/zap"
+)
+
+// AuthHandler - обработчик аутентификации
+type AuthHandler struct {
+	uc        usecase.UseCaseInterface
+	log       *zap.Logger
+	client    usersclient.ClientProvider
+	cfg       *config.Config
+	validator *validator.Validate
+}
+
+// New - конструктор ручек
+func New(service usecase.UseCaseInterface, logger *zap.Logger, cfg *config.Config, client usersclient.ClientProvider) *AuthHandler {
+	valid := validator.New(validator.WithRequiredStructEnabled())
+	if err := valid.RegisterValidation("has4enletters", pkg.Has4EnLetters); err != nil {
+		logger.Fatal("Failed to register has4enletters", zap.Error(err))
+	}
+	if err := valid.RegisterValidation("has3letters", pkg.Has3Letters); err != nil {
+		logger.Fatal("Failed to register has3letters", zap.Error(err))
+	}
+	if err := valid.RegisterValidation("has2letters", pkg.Has2Letters); err != nil {
+		logger.Fatal("Failed to register has2letters", zap.Error(err))
+	}
+	if err := valid.RegisterValidation("has1letters", pkg.Has1Letters); err != nil {
+		logger.Fatal("Failed to register has1letters validator", zap.Error(err))
+	}
+	if err := valid.RegisterValidation("passwordregex8", pkg.PasswordRegex8); err != nil {
+		logger.Fatal("Failed to register passwordregex8 validator", zap.Error(err))
+	}
+
+	return &AuthHandler{
+		uc:        service,
+		log:       logger,
+		cfg:       cfg,
+		client:    client,
+		validator: valid,
+	}
+}
+
+// Register godoc
+// @Summary Регистрация пользователя
+// @Description Регистрирует нового пользователя, создаёт учётную запись и возвращает access и refresh JWT токены
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param input body entity.RegisterRequest true "Данные для регистрации пользователя"
+// @Success 201 {object} entity.RegisterResponse "Пользователь успешно зарегистрирован"
+// @Failure 400 {object} entity.ErrorResponse "Некорректное тело запроса"
+// @Failure 409 {object} entity.ErrorResponse "Пользователь с таким логином уже существует"
+// @Failure 500 {object} entity.ErrorResponse "Внутренняя ошибка сервера"
+// @Router /api/v1/auth/register [post]
+func (h *AuthHandler) Register(ctx *gin.Context) {
+	var user entity.RegisterRequest
+
+	if err := ctx.ShouldBindJSON(&user); err != nil {
+		h.log.Warn("Register: invalid request body", zap.Error(err))
+		ctx.JSON(http.StatusBadRequest, entity.ErrorResponse{
+			ErrorDetail: entity.ErrorDetail{
+				Code:    "INVALID_REQUEST",
+				Message: "Invalid JSON body",
+			},
+		})
+		return
+	}
+
+	// валидация данных
+	var ve validator.ValidationErrors
+
+	if err := h.validator.StructCtx(ctx, &user); err != nil {
+		h.log.Warn("Register: validation failed", zap.Error(err))
+		if errors.As(err, &ve) {
+			validationErrors := make([]entity.ErrorDetail, len(ve))
+			for i, e := range ve {
+				validationErrors[i] = entity.ErrorDetail{
+					Code:    e.Field(),
+					Message: pkg.ValidationErrorToMessage(e),
+				}
+			}
+			ctx.JSON(http.StatusBadRequest, entity.ErrorResponseValidation{
+				ErrorDetail: validationErrors,
+			})
+			return
+		}
+		ctx.JSON(http.StatusBadRequest, entity.ErrorResponse{
+			ErrorDetail: entity.ErrorDetail{
+				Code:    "VALIDATION_FAILED",
+				Message: "Validation failed",
+			},
+		})
+		return
+	}
+
+	data, err := h.uc.RegisterUser(ctx, user)
+	if err != nil {
+		h.handleError(ctx, err)
+		return
+	}
+
+	response := entity.RegisterResponse{
+		ID:           data.ID,
+		AccessToken:  data.AccessToken,
+		RefreshToken: data.RefreshToken,
+		Username:     user.Username,
+	}
+
+	ctx.JSON(http.StatusCreated, response)
+}
+
+// Refresh godoc
+// @Summary Обновление JWT токенов
+// @Description Обновляет access и refresh токены по валидному refresh токену и access токену из заголовка Authorization
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer access token" example(Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...)
+// @Param input body entity.TokenRequest true "Refresh токен"
+// @Success 200 {object} entity.RefreshResponse "Токены успешно обновлены"
+// @Failure 400 {object} entity.ErrorResponse "Отсутствует refresh token или заголовок Authorization"
+// @Failure 401 {object} entity.ErrorResponse "Токен невалиден или истёк срок действия"
+// @Failure 500 {object} entity.ErrorResponse "Внутренняя ошибка сервера"
+// @Router /api/v1/auth/refresh [post]
+func (h *AuthHandler) Refresh(ctx *gin.Context) {
+	var req entity.TokenRequest
+
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		h.log.Warn("Refresh: invalid request body", zap.Error(err))
+		ctx.JSON(http.StatusBadRequest, entity.ErrorResponse{
+			ErrorDetail: entity.ErrorDetail{
+				Code:    "INVALID_REQUEST",
+				Message: err.Error(),
+			},
+		})
+		return
+	}
+
+	if req.RefreshToken == "" {
+		ctx.JSON(http.StatusBadRequest, entity.ErrorResponse{
+			ErrorDetail: entity.ErrorDetail{
+				Code:    "INVALID_REQUEST",
+				Message: "Refresh token is required",
+			},
+		})
+		return
+	}
+
+	authHeader := ctx.GetHeader("Authorization")
+	if authHeader == "" {
+		ctx.JSON(http.StatusBadRequest, entity.ErrorResponse{
+			ErrorDetail: entity.ErrorDetail{
+				Code:    "MISSING_AUTH_HEADER",
+				Message: "Authorization header is required",
+			},
+		})
+		return
+	}
+
+	data, err := h.uc.RefreshTokens(ctx, req.RefreshToken, authHeader)
+	if err != nil {
+		h.handleError(ctx, err)
+		return
+	}
+
+	response := entity.RefreshResponse{
+		RefreshToken: data.RefreshToken,
+		AccessToken:  data.AccessToken,
+	}
+
+	ctx.JSON(http.StatusOK, response)
+}
+
+// Login godoc
+// @Summary Аутентификация пользователя
+// @Description Выполняет вход пользователя по логину и паролю и возвращает access и refresh JWT токены
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param input body entity.LoginUserInfo true "Логин и пароль пользователя"
+// @Success 200 {object} entity.LoginResponse "Аутентификация прошла успешно"
+// @Failure 400 {object} entity.ErrorResponse "Некорректное тело запроса"
+// @Failure 401 {object} entity.ErrorResponse "Неверный логин или пароль"
+// @Failure 500 {object} entity.ErrorResponse "Внутренняя ошибка сервера"
+// @Router /api/v1/auth/login [post]
+func (h *AuthHandler) Login(ctx *gin.Context) {
+	var user entity.LoginUserInfo
+	if err := ctx.ShouldBindJSON(&user); err != nil {
+		h.log.Warn("Login: invalid request body", zap.Error(err))
+		ctx.JSON(http.StatusBadRequest, entity.ErrorResponse{
+			ErrorDetail: entity.ErrorDetail{
+				Code:    "INVALID_REQUEST",
+				Message: "Invalid JSON body",
+			},
+		})
+		return
+	}
+
+	var ve validator.ValidationErrors
+
+	if err := h.validator.StructCtx(ctx, &user); err != nil {
+		h.log.Warn("Login: validation failed", zap.Error(err))
+		if errors.As(err, &ve) {
+			validationErrors := make([]entity.ErrorDetail, len(ve))
+			for i, e := range ve {
+				validationErrors[i] = entity.ErrorDetail{
+					Code:    e.Field(),
+					Message: pkg.ValidationErrorToMessage(e),
+				}
+			}
+			ctx.JSON(http.StatusBadRequest, entity.ErrorResponseValidation{
+				ErrorDetail: validationErrors,
+			})
+			return
+		}
+		ctx.JSON(http.StatusBadRequest, entity.ErrorResponse{
+			ErrorDetail: entity.ErrorDetail{
+				Code:    "VALIDATION_FAILED",
+				Message: "Validation failed",
+			},
+		})
+		return
+	}
+
+	login, err := h.uc.LoginAccount(ctx, user.Login, user.Password)
+	if err != nil {
+		h.handleError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, login)
+}
