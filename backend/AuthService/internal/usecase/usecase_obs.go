@@ -10,13 +10,15 @@ import (
 	"go.opentelemetry.io/otel/codes"
 )
 
-const nameTracer = "usecase"
+const nameTracer = "usecase_auth"
 
+// UseCaseObs - структура обертки
 type UseCaseObs struct {
 	*UseCase
 	metrics *pkgmetrics.Metrics
 }
 
+// NewObs - конструктор
 func NewObs(uc *UseCase) *UseCaseObs {
 	return &UseCaseObs{
 		UseCase: uc,
@@ -24,6 +26,7 @@ func NewObs(uc *UseCase) *UseCaseObs {
 	}
 }
 
+// observe сбор данных
 func (uc *UseCaseObs) observe(ctx context.Context, method string, fn func(context.Context) error) error {
 	ctx, span := otel.Tracer(nameTracer).Start(ctx, method)
 	defer span.End()

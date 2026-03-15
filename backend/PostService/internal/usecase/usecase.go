@@ -21,6 +21,14 @@ type RepositoryProvider interface {
 	GetPostsFromFeed(ctx context.Context, authorIDs []uuid.UUID, limit int, cursor *entity.PostCursor) (*entity.PostListResponseFromFeed, error)
 }
 
+type UseCaseInterface interface {
+	CreatePost(ctx context.Context, creatorUserID uuid.UUID, createPost entity.CreatePostRequest) (*entity.CreatePostResponse, error)
+	UpdatePost(ctx context.Context, postID uuid.UUID, authorID uuid.UUID, updateReq entity.UpdateUserPostRequest) error
+	DeletePost(ctx context.Context, postID uuid.UUID, userID uuid.UUID) error
+	GetPostsUser(ctx context.Context, authorID uuid.UUID, limit int, cursor *entity.PostCursor) (*entity.PostListResponse, error)
+	GetPostsFromFeed(ctx context.Context, userUsername string, userID uuid.UUID, accessToken string, limit int, cursor *entity.PostCursor) (*entity.PostListResponseFromFeed, error)
+}
+
 // PostUseCase - структура бизнес логики
 type PostUseCase struct {
 	producer *kafka.Producer
@@ -31,14 +39,17 @@ type PostUseCase struct {
 }
 
 // New - конструктор бизнес логики
-func New(repo RepositoryProvider, cfg *config.Config, producer *kafka.Producer, log *zap.Logger, client subsclient.ClientProvider) *PostUseCase {
-	return &PostUseCase{
+func New(repo RepositoryProvider, cfg *config.Config, producer *kafka.Producer,
+	log *zap.Logger, client subsclient.ClientProvider) UseCaseInterface {
+	usecase := &PostUseCase{
 		producer: producer,
 		repo:     repo,
 		cfg:      cfg,
 		client:   client,
 		log:      log.Named("UseCase"),
 	}
+
+	return NewObs(usecase)
 }
 
 // CreatePost - создаем пост и отправляем в FeedService

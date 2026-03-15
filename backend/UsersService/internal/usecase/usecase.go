@@ -51,6 +51,22 @@ type RepositoryProvider interface {
 	AvatarStorage
 }
 
+type UsecaseInterface interface {
+	AddUser(ctx context.Context, addUserInfo entity.AddUserRequest) error
+	CompareAuthData(ctx context.Context, users entity.AuthRequest) (*entity.CompareDataResponse, error)
+	UpdateUserProfile(ctx context.Context, id uuid.UUID, updateProfileInfo entity.UpdateUserProfileInfoRequest) (*entity.UpdateUserProfileInfoResponse, error)
+	GetUserProfileByID(ctx context.Context, yourUserID uuid.UUID, otherUserID uuid.UUID) (*entity.ProfileUserInfoResponse, error)
+	SubscribeToUser(ctx context.Context, followerID uuid.UUID, followingID uuid.UUID) error
+	UnsubscribeFromUser(ctx context.Context, followerID uuid.UUID, followingID uuid.UUID) error
+	GetSubsUser(ctx context.Context, userID uuid.UUID) (*entity.SubsList, error)
+	UploadAvatar(ctx context.Context, userID uuid.UUID, avatarInfo entity.AvatarRequest) error
+	GlobalSearchPeople(ctx context.Context, firstName, lastName string) (*entity.PersonDateList, error)
+	GetRefreshToken(ctx context.Context, id uuid.UUID) (*entity.TokenResponse, error)
+	UpdateRefreshToken(ctx context.Context, req entity.UpdateRefreshTokenRequest) error
+	GetUserIDByUsername(ctx context.Context, username string) (string, error)
+	GetAvatarURL(ctx context.Context, bucketName string, userID uuid.UUID) (string, error)
+}
+
 // Usecase - структура бизнес логики
 type Usecase struct {
 	repo RepositoryProvider
@@ -59,12 +75,14 @@ type Usecase struct {
 }
 
 // New - конструктор
-func New(repo RepositoryProvider, cfg *config.Config, log *zap.Logger) *Usecase {
-	return &Usecase{
+func New(repo RepositoryProvider, cfg *config.Config, log *zap.Logger) UsecaseInterface {
+	usecase := &Usecase{
 		repo: repo,
 		cfg:  cfg,
 		log:  log.Named("Usecase"),
 	}
+
+	return NewObs(usecase)
 }
 
 // AddUser - создание/ добавление нового пользователя
