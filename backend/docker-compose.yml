@@ -149,10 +149,12 @@ services:
       - "9090:9090"
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
     depends_on:
       - auth_service
     networks:
       - app-network
+    restart: always
 
   grafana:
     image: grafana/grafana:latest
@@ -160,10 +162,13 @@ services:
       - "3001:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
     depends_on:
       - prometheus
     networks:
       - app-network
+    restart: always
 
 networks:
   app-network:
@@ -172,3 +177,5 @@ networks:
 volumes:
   minio-data:
   postgres_data:
+  grafana_data:
+  prometheus_data:

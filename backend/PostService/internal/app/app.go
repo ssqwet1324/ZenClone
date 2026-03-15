@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-resty/resty/v2"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 )
 
@@ -20,6 +21,7 @@ func Run() {
 	server := gin.Default()
 
 	server.Use(middleware.ServerMiddleware())
+	server.Use(middleware.PrometheusMiddleware())
 
 	cfg, err := config.New()
 	if err != nil {
@@ -61,6 +63,9 @@ func Run() {
 		apiV1.GET("/by-user/:userID", postHandler.GetPostsUser)
 		apiV1.GET("/feed", userMiddleware, postHandler.GetPostsFeedFromUser)
 	}
+
+	//Metrics
+	server.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	if err := server.Run(":8082"); err != nil {
 		logger.Fatal("failed to run http server", zap.Error(err))

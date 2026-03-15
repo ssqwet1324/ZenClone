@@ -34,7 +34,11 @@ func NewMetrics(name string) *Metrics {
 	}
 
 	// Прогрев - все методы сразу видны в Prometheus/Grafana
-	methods := []string{"RegisterUser", "LoginAccount", "RefreshTokens"}
+	methods := []string{
+		"AddUser", "CompareAuthData", "UpdateUserProfile",
+		"GetUserProfileByID", "SubscribeToUser", "UnsubscribeFromUser",
+		"GetSubsUser", "UploadAvatar", "GlobalSearchPeople",
+	}
 	for _, method := range methods {
 		m.requestSuccess.WithLabelValues(method).Add(0)
 		m.requestError.WithLabelValues(method).Add(0)

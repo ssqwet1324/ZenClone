@@ -7,3 +7,5 @@ scrape_configs:
     static_configs:
       - targets:
           - "auth_service:8080"
+          - "users_service:8081"
+          - "post_service:8082"

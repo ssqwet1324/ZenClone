@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 )
 
@@ -17,6 +18,7 @@ func Run() {
 	server := gin.Default()
 
 	server.Use(middleware.ServerMiddleware())
+	server.Use(middleware.PrometheusMiddleware())
 
 	cfg, err := config.New()
 	if err != nil {
@@ -62,6 +64,9 @@ func Run() {
 		internalAPI.POST("/get-refresh-token", userHandler.GetRefreshToken)
 		internalAPI.POST("/update-refresh-token", userHandler.UpdateRefreshToken)
 	}
+
+	//Metrics
+	server.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	if err := server.Run(":8081"); err != nil {
 		logger.Fatal("failed to run server", zap.Error(err))

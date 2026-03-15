@@ -17,12 +17,12 @@ import (
 
 // PostHandler - ручки для постов
 type PostHandler struct {
-	uc  *usecase.PostUseCase
+	uc  usecase.UseCaseInterface
 	log *zap.Logger
 }
 
 // New - конструктор
-func New(uc *usecase.PostUseCase, log *zap.Logger) *PostHandler {
+func New(uc usecase.UseCaseInterface, log *zap.Logger) *PostHandler {
 	return &PostHandler{
 		uc:  uc,
 		log: log.Named("Handler"),

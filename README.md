@@ -51,7 +51,7 @@ ZenClone - это полнофункциональная социальная с
 ### Требования
 
 - Docker и Docker Compose
-- Go 1.25+ (для локальной разработки)
+- Go 1.25+
 
 ### Установка и запуск
 
@@ -96,6 +96,37 @@ docker-compose up -d
 6. Откройте браузер и перейдите по адресу:
 ```
 http://localhost:3000
+```
+
+## 📊 Мониторинг и инфраструктура
+
+| Сервис | Адрес | Описание |
+|--------|-------|----------|
+| Grafana | [localhost:3001](http://localhost:3001) | Дашборды метрик (admin / admin) |
+| Prometheus | [localhost:9090](http://localhost:9090) | Сбор и хранение метрик |
+| Kafka UI | [localhost:8088](http://localhost:8088) | Управление топиками Kafka |
+| MinIO Console | [localhost:9001](http://localhost:9001) | Хранилище медиафайлов (minioadmin / minioadmin) |
+
+### Grafana дашборды
+
+После запуска перейди на [localhost:3001](http://localhost:3001) и добавь Prometheus как datasource:
+- **URL**: `http://prometheus:9090`
+
+Доступные метрики по каждому сервису:
+- `usecase_success_rate_total` — успешные вызовы бизнес-логики
+- `usecase_errors_rate_total` — ошибки бизнес-логики
+- `usecase_duration` — время выполнения методов
+
+#### Примеры PromQL запросов
+```bash
+# RPS по методам
+rate(usecase_success_rate_total[1m])
+
+# Error rate
+rate(usecase_errors_rate_total[1m])
+
+# Latency p95
+histogram_quantile(0.95, rate(usecase_duration_bucket[5m]))
 ```
 
 ## 🔧 Конфигурация
@@ -172,6 +203,8 @@ http://localhost:3000
 - **JWT** - Аутентификация
 - **Swagger** - API документация
 - **Zap** - Логирование
+- **Prometheus** - Метрики для сервисов
+- **Grafana** - Визуализация метрик
 
 ### Frontend
 - **HTML5/CSS3/JavaScript (Vanilla)**
@@ -187,30 +220,56 @@ http://localhost:3000
 ZenClone/
 ├── backend/
 │   ├── AuthService/          # Сервис аутентификации
-│   │   ├── internal/
+│   │   ├── docs/             # Файлы, используемые swagger(swaggo) 
+│   │   ├── internal/ 
+│   │   │   ├── app/          # Подключение сервиса
+│   │   │   ├── client/       # Связь с внешними сервисами
+│   │   │   ├── config/       # Конфигурация
+│   │   │   ├── entity/       # Сущности(структуры)
 │   │   │   ├── handler/      # HTTP handlers
-│   │   │   ├── usecase/      # Бизнес-логика
+│   │   │   ├── middleware/   # Промежуточный обработчик
+│   │   │   ├── pkg/          # Вспомогательный код
 │   │   │   ├── repository/   # Redis репозиторий
-│   │   │   └── config/       # Конфигурация
-│   │   └── .env
+│   │   │   └── usecase/      # Бизнес-логика
+│   │   ├── Dockerfile        # Инструкции для Docker
+│   │   └── .env              # Переменные окружения  
+│   │
+│   ├── db/                   # Инициализация миграций
+│   │
 │   ├── UsersService/         # Сервис пользователей
-│   │   ├── internal/
+│   │   ├── docs/
+│   │   ├── internal/ 
+│   │   │   ├── app/ 
+│   │   │   ├── config/
+│   │   │   ├── entity/ 
 │   │   │   ├── handler/
-│   │   │   ├── usecase/
+│   │   │   ├── middleware/
+│   │   │   ├── pkg/   
 │   │   │   ├── repository/   # PostgreSQL + MinIO
-│   │   │   └── config/
+│   │   │   └── usecase/ 
 │   │   ├── migrations/       # Миграции БД
+│   │   ├── Dockerfile
 │   │   └── .env
+│   │
 │   ├── PostService/          # Сервис постов
+│   │   ├── docs/
 │   │   ├── internal/
+│   │   │   ├── app/ 
+│   │   │   ├── client/
+│   │   │   ├── config/
+│   │   │   ├── entity/ 
 │   │   │   ├── handler/
-│   │   │   ├── usecase/
-│   │   │   ├── repository/   # PostgreSQL
 │   │   │   ├── kafka/        # Kafka producer
-│   │   │   └── config/
-│   │   ├── migrations/
+│   │   │   ├── middleware/
+│   │   │   ├── pkg/ 
+│   │   │   ├── repository/   # PostgreSQL
+│   │   │   └── usecase/
+│   │   ├── migrations/       # Миграции БД
+│   │   ├── Dockerfile
 │   │   └── .env
+│   ├── prometheus.yml        # Настройка prometheus
 │   └── docker-compose.yml    # Docker Compose конфигурация
+│
 └── html-frontend/            # Frontend приложение
     ├── js/                   # JavaScript модули
     ├── index.html
