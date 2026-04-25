@@ -4,13 +4,17 @@ import (
 	"PostService/internal/client/subsclient"
 	"PostService/internal/config"
 	"PostService/internal/entity"
-	"PostService/internal/kafka"
 	"context"
 	"encoding/json"
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
+
+// ProducerProvider - интерфейс для kafka producer
+type ProducerProvider interface {
+	WriteMessages(ctx context.Context, key string, value []byte) error
+}
 
 // RepositoryProvider - функции из repository
 type RepositoryProvider interface {
@@ -31,7 +35,7 @@ type UseCaseInterface interface {
 
 // PostUseCase - структура бизнес логики
 type PostUseCase struct {
-	producer *kafka.Producer
+	producer ProducerProvider
 	repo     RepositoryProvider
 	cfg      *config.Config
 	log      *zap.Logger
@@ -39,7 +43,7 @@ type PostUseCase struct {
 }
 
 // New - конструктор бизнес логики
-func New(repo RepositoryProvider, cfg *config.Config, producer *kafka.Producer,
+func New(repo RepositoryProvider, cfg *config.Config, producer ProducerProvider,
 	log *zap.Logger, client subsclient.ClientProvider) UseCaseInterface {
 	usecase := &PostUseCase{
 		producer: producer,
